@@ -149,6 +149,14 @@ public open class TextArea(
      * pass a custom theme to override colours or backgrounds.
      */
     public val syntaxTheme: SyntaxTheme = SyntaxTheme.ANSI_DARK,
+    /**
+     * Soft-wrap long lines to the widget's assigned width instead of
+     * scrolling horizontally. Wrapped continuations don't update the
+     * document — only the rendering. Cursor navigation stays
+     * line-and-column based; users can still arrow off the visible end
+     * of a wrapped row to land on the next document line.
+     */
+    public val wordWrap: Boolean = false,
     id: String? = null,
     classes: Set<String> = emptySet(),
 ) : Widget(id, classes), Scrollable {
@@ -185,6 +193,18 @@ public open class TextArea(
         private set
 
     public var selection: Selection = Selection(cursor, cursor)
+        private set
+
+    /** Current incremental-search query, or null when search is inactive. */
+    public var searchQuery: String? = null
+        private set
+
+    /** All matches of the active [searchQuery] in document order. Empty when search is off. */
+    public var searchMatches: List<Selection> = emptyList()
+        private set
+
+    /** Index of the currently-focused match within [searchMatches], or -1 if none. */
+    public var activeMatchIndex: Int = -1
         private set
 
     override val canFocus: Boolean get() = true
@@ -348,40 +368,113 @@ public open class TextArea(
         select(Selection(Location.ZERO, document.endLocation()))
     }
 
+    /**
+     * Start (or update) an incremental search. All occurrences of [query]
+     * (case-sensitive by default) are highlighted in the editor; the cursor
+     * jumps to the first match. Pass an empty string or `null` to clear.
+     */
+    public fun search(query: String?, ignoreCase: Boolean = false) {
+        if (query.isNullOrEmpty()) { clearSearch(); return }
+        searchQuery = query
+        searchMatches = findAll(query, ignoreCase)
+        activeMatchIndex = if (searchMatches.isEmpty()) -1 else 0
+        searchMatches.firstOrNull()?.let { setCursor(it.start) }
+        refresh()
+    }
+
+    /** Clear the active search highlight. */
+    public fun clearSearch() {
+        searchQuery = null
+        searchMatches = emptyList()
+        activeMatchIndex = -1
+        refresh()
+    }
+
+    /** Move the cursor to the next match, wrapping around. No-op if no matches. */
+    public fun nextMatch() {
+        if (searchMatches.isEmpty()) return
+        activeMatchIndex = (activeMatchIndex + 1) % searchMatches.size
+        setCursor(searchMatches[activeMatchIndex].start)
+    }
+
+    /** Move the cursor to the previous match, wrapping around. */
+    public fun previousMatch() {
+        if (searchMatches.isEmpty()) return
+        activeMatchIndex = if (activeMatchIndex <= 0) searchMatches.lastIndex else activeMatchIndex - 1
+        setCursor(searchMatches[activeMatchIndex].start)
+    }
+
+    private fun findAll(query: String, ignoreCase: Boolean): List<Selection> {
+        if (query.isEmpty()) return emptyList()
+        val results = mutableListOf<Selection>()
+        for (rowIdx in 0 until document.lineCount) {
+            val line = document.line(rowIdx)
+            var fromCol = 0
+            while (fromCol <= line.length) {
+                val idx = line.indexOf(query, fromCol, ignoreCase)
+                if (idx < 0) break
+                results += Selection(Location(rowIdx, idx), Location(rowIdx, idx + query.length))
+                fromCol = idx + query.length.coerceAtLeast(1)
+            }
+        }
+        return results
+    }
+
     override fun render(): Renderable {
         val text = Text()
         val cursorStyle = Style(color = Color.Black, bgcolor = Color.White)
         val (selStart, selEnd) = selection.ordered()
         val gutterStyle = Style(color = Color.DarkGrey, dim = true)
         val gutterWidth = if (showLineNumbers) document.lineCount.toString().length + 1 else 0
+        val matchStyle = Style(bgcolor = Color.Rgb(0x80, 0x60, 0x00))   // muted amber
+        val activeMatchStyle = Style(bgcolor = Color.Yellow, color = Color.Black)
 
         // Compute per-char syntax-token styles for the whole document up front.
-        // Map a (row, col) location to the corresponding global char offset so
-        // we can look up the syntax style.
         val fullText = document.text
         val syntaxStyles = ensureTokenStyles(fullText)
         var globalOffset = 0
+
+        // Word-wrap: assigned region width minus the gutter is the wrap column.
+        val wrapWidth = if (wordWrap) {
+            val region = lastRegion
+            if (region != null) (region.width - gutterWidth).coerceAtLeast(1) else 0
+        } else 0
 
         for (rowIdx in 0 until document.lineCount) {
             if (showLineNumbers) {
                 text.append("${(rowIdx + 1).toString().padStart(gutterWidth - 1)} ", gutterStyle)
             }
             val line = document.line(rowIdx)
+            var visualCol = 0
             for (colIdx in 0..line.length) {
                 val here = Location(rowIdx, colIdx)
                 val isCursor = hasFocus && here == cursor && selection.isCollapsed
                 val isSelected = here in selStart..selEnd && !selection.isCollapsed
+                val matchStyleAt = matchStyleAt(here)
                 if (colIdx < line.length) {
                     val ch = line[colIdx].toString()
                     val syntaxStyle = syntaxStyles?.getOrNull(globalOffset)
                     val style = when {
                         isCursor -> cursorStyle
                         isSelected -> Style(bgcolor = Color.Blue)
+                        matchStyleAt === activeMatchStyle -> activeMatchStyle
+                        matchStyleAt === matchStyle -> matchStyle
                         syntaxStyle != null -> syntaxStyle
                         else -> Style.NULL
                     }
                     text.append(ch, style)
                     globalOffset += 1
+                    visualCol += 1
+                    // Soft-wrap: insert a newline at the wrap column. The next
+                    // visible row continues this logical line; document cursor
+                    // navigation is unaffected.
+                    if (wordWrap && wrapWidth > 0 && visualCol == wrapWidth && colIdx < line.length - 1) {
+                        text.append("\n")
+                        if (showLineNumbers) {
+                            text.append(" ".repeat(gutterWidth), gutterStyle)
+                        }
+                        visualCol = 0
+                    }
                 } else if (isCursor) {
                     // Cursor at end-of-line: render a blank cursor block.
                     text.append(" ", cursorStyle)
@@ -393,6 +486,19 @@ public open class TextArea(
             }
         }
         return text
+    }
+
+    private fun matchStyleAt(loc: Location): Style? {
+        if (searchMatches.isEmpty()) return null
+        for ((i, m) in searchMatches.withIndex()) {
+            if (m.start.row == loc.row && loc.column >= m.start.column && loc.column < m.end.column) {
+                return if (i == activeMatchIndex)
+                    Style(bgcolor = Color.Yellow, color = Color.Black)
+                else
+                    Style(bgcolor = Color.Rgb(0x80, 0x60, 0x00))
+            }
+        }
+        return null
     }
 
     private operator fun ClosedRange<Location>.contains(loc: Location): Boolean =
