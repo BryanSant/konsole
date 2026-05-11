@@ -20,9 +20,22 @@ public data class Key(
 ) : Event() {
     /** True if this key event matches the given [name] like `"ctrl+c"`, `"escape"`, etc. */
     public fun matches(name: String): Boolean {
-        val parts = name.lowercase().split("+")
-        val keyPart = parts.last()
-        val mods = parts.dropLast(1).toSet()
+        val lower = name.lowercase()
+        // The literal '+' character is also our modifier separator, so a
+        // naive split("+") would make it unbindable. Handle the corner cases:
+        //   "+"        → keyPart='+', no mods
+        //   "shift++"  → keyPart='+', mods={shift}      (trailing '++')
+        //   "ctrl+c"   → keyPart='c', mods={ctrl}       (normal case)
+        val (keyPart, modString) = when {
+            lower == "+" -> "+" to ""
+            lower.endsWith("++") -> "+" to lower.dropLast(2)
+            else -> {
+                val idx = lower.lastIndexOf('+')
+                if (idx < 0) lower to ""
+                else lower.substring(idx + 1) to lower.substring(0, idx)
+            }
+        }
+        val mods = if (modString.isEmpty()) emptySet() else modString.split("+").toSet()
         if (mods.contains("ctrl") != modifiers.hasControl()) return false
         if (mods.contains("alt") != modifiers.hasAlt()) return false
         if (mods.contains("shift") != modifiers.hasShift()) return false
