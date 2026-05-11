@@ -8,6 +8,12 @@ plugins {
     signing
 }
 
+// Keep the published artifact / jar name as "konsole-core" even though the
+// Gradle project directory is just "core" (the parent dir is already "konsole").
+base {
+    archivesName.set("konsole-core")
+}
+
 kotlin {
     jvmToolchain(25)
     explicitApi()
@@ -61,6 +67,7 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
+            artifactId = "konsole-core"
             pom {
                 name.set("konsole-core")
                 description.set("Konsole core terminal primitives — JLine FFM wrapper, ANSI commands, input parser.")

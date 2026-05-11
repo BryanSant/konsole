@@ -8,6 +8,10 @@ plugins {
     signing
 }
 
+base {
+    archivesName.set("konsole-rich")
+}
+
 kotlin {
     jvmToolchain(25)
     explicitApi()
@@ -22,7 +26,7 @@ kotlin {
 }
 
 dependencies {
-    api(project(":konsole-core"))
+    api(project(":core"))
     implementation(libs.commonmark)
     implementation(libs.commonmark.gfm.tables)
 
@@ -50,6 +54,7 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
+            artifactId = "konsole-rich"
             pom {
                 name.set("konsole-rich")
                 description.set("Konsole rich port — Console, Segment, Style, renderables (Panel, Table, Tree, Layout, Live, Progress, Markdown, Syntax).")

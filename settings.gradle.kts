@@ -22,4 +22,4 @@ nmcpSettings {
     }
 }
 
-include(":konsole-core", ":konsole-rich", ":konsole-textual", ":examples")
+include(":core", ":rich", ":textualize", ":examples")

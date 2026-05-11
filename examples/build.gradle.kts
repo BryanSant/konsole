@@ -18,9 +18,9 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":konsole-core"))
-    implementation(project(":konsole-rich"))
-    implementation(project(":konsole-textual"))
+    implementation(project(":core"))
+    implementation(project(":rich"))
+    implementation(project(":textualize"))
 }
 
 tasks.register<JavaExec>("runExample") {

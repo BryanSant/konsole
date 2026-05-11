@@ -8,6 +8,10 @@ plugins {
     signing
 }
 
+base {
+    archivesName.set("konsole-textual")
+}
+
 kotlin {
     jvmToolchain(25)
     explicitApi()
@@ -22,7 +26,7 @@ kotlin {
 }
 
 dependencies {
-    api(project(":konsole-rich"))
+    api(project(":rich"))
     implementation(libs.kotlin.reflect)
 
     testImplementation(libs.kotest.runner.junit5)
@@ -49,6 +53,7 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
+            artifactId = "konsole-textual"
             pom {
                 name.set("konsole-textual")
                 description.set("Konsole textual port — App, Screen, Widget, Driver, TCSS, built-in widgets.")

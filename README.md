@@ -10,9 +10,11 @@ with native terminal access via [JLine FFM](https://github.com/jline/jline3).
 
 | Module               | Purpose                                                                |
 |----------------------|------------------------------------------------------------------------|
-| `:konsole-core`      | Terminal primitives — JLine wrapper, ANSI commands, input parser       |
-| `:konsole-rich`      | `rich` port — Console, Style, Text, renderables, Live, Progress, etc.  |
-| `:konsole-textual`   | `textual` port — App, Screen, Widget, TCSS, built-in widgets           |
+| `:core`              | Terminal primitives — JLine wrapper, ANSI commands, input parser       |
+| `:rich`              | `rich` port — Console, Style, Text, renderables, Live, Progress, etc.  |
+| `:textualize`        | `textual` port — App, Screen, Widget, TCSS, built-in widgets           |
+
+(Published Maven artifacts keep the `konsole-` prefix: `konsole-core`, `konsole-rich`, `konsole-textual`.)
 | `:examples`          | Runnable demos                                                         |
 
 ## Stack
@@ -35,7 +37,7 @@ consumers must pass it themselves.
 ## Development
 
 - `./gradlew build` — compile + test (excludes TTY-required tests)
-- `./gradlew :konsole-core:ttyTest` — opt-in real-terminal integration tests
+- `./gradlew :core:ttyTest` — opt-in real-terminal integration tests
 
 ## License
 
