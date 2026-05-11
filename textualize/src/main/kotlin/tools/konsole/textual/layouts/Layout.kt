@@ -188,15 +188,40 @@ public object GridLayout : Layout {
         val totalRows = occupancy.size.coerceAtLeast(declaredRows)
 
         // ---- Pass 2: resolve track sizes --------------------------------
+        // For `auto` tracks: measure each cell's natural size and use the
+        // max along each row/column. Spanning children contribute to every
+        // row/column they cover via their natural size / span.
+        val naturalColWidths = IntArray(cols)
+        val naturalRowHeights = IntArray(totalRows)
+        val availableForMeasure = (region.width - gutterH * (cols - 1)).coerceAtLeast(0)
+        val perCellHint = if (cols > 0) (availableForMeasure / cols).coerceAtLeast(1) else 1
+        for ((i, cell) in assignments.withIndex()) {
+            val (widget, _) = visible[i]
+            val widgetW = widget.naturalWidth(maxWidth = perCellHint * cell.colSpan)
+            val widgetH = widget.naturalHeight(forWidth = widgetW.coerceAtLeast(1))
+            val perColW = (widgetW / cell.colSpan).coerceAtLeast(1)
+            val perRowH = (widgetH / cell.rowSpan).coerceAtLeast(1)
+            for (c in 0 until cell.colSpan) {
+                val col = cell.col + c
+                if (col in 0 until cols && perColW > naturalColWidths[col]) naturalColWidths[col] = perColW
+            }
+            for (r in 0 until cell.rowSpan) {
+                val row = cell.row + r
+                if (row in 0 until totalRows && perRowH > naturalRowHeights[row]) naturalRowHeights[row] = perRowH
+            }
+        }
+
         val columnSizes = resolveTrackSizes(
             count = cols,
-            available = (region.width - gutterH * (cols - 1)).coerceAtLeast(0),
+            available = availableForMeasure,
             declared = parentStyles.gridColumns,
+            naturalSizes = naturalColWidths,
         )
         val rowSizes = resolveTrackSizes(
             count = totalRows,
             available = (region.height - gutterV * (totalRows - 1)).coerceAtLeast(0),
             declared = parentStyles.gridRows,
+            naturalSizes = naturalRowHeights,
         )
 
         // Prefix offsets for each column / row (including gutters).
@@ -232,34 +257,47 @@ public object GridLayout : Layout {
      * list of [Scalar]s (cells / `%` / `fr` / `auto`) and [available] space
      * to share. When [declared] is shorter than [count], the last entry
      * repeats. When `null`, every track is `1fr`.
+     *
+     * [naturalSizes] holds the measured preferred size of the widest/tallest
+     * child in each track — used to size `auto` tracks. Pass an array of
+     * zeros (the default) to fall back to treating `auto` as `1fr`.
      */
-    private fun resolveTrackSizes(count: Int, available: Int, declared: List<Scalar>?): IntArray {
+    private fun resolveTrackSizes(
+        count: Int,
+        available: Int,
+        declared: List<Scalar>?,
+        naturalSizes: IntArray = IntArray(count),
+    ): IntArray {
         val tracks = IntArray(count)
         val list: List<Scalar> = if (declared.isNullOrEmpty()) {
             List(count) { Scalar(1.0, LengthUnit.Fraction) }
         } else {
             List(count) { i -> declared.getOrElse(i) { declared.last() } }
         }
-        // First fix every non-fraction track. `auto` is treated as 1fr for now
-        // (real auto sizing would measure children, deferred for later).
+        // Pass A: pin fixed-size and auto tracks. Auto = the measured natural
+        // size of children in that track (clamped to remaining space).
         var consumed = 0
         var totalFractions = 0.0
         for (i in 0 until count) {
             val s = list[i]
             tracks[i] = when {
-                s.isFraction || s.isAuto -> 0
+                s.isAuto -> {
+                    val natural = naturalSizes.getOrElse(i) { 0 }
+                    natural.coerceAtMost((available - consumed).coerceAtLeast(0))
+                        .also { consumed += it }
+                }
+                s.isFraction -> 0
                 else -> s.resolve(available).coerceAtLeast(0).also { consumed += it }
             }
-            if (s.isFraction || s.isAuto) totalFractions += (if (s.isAuto) 1.0 else s.value)
+            if (s.isFraction) totalFractions += s.value
         }
-        // Distribute the remainder across fraction/auto tracks.
+        // Pass B: distribute the remainder across fraction tracks.
         val remaining = (available - consumed).coerceAtLeast(0)
         if (totalFractions > 0.0) {
             for (i in 0 until count) {
                 val s = list[i]
-                if (s.isFraction || s.isAuto) {
-                    val share = if (s.isAuto) 1.0 else s.value
-                    tracks[i] = ((share / totalFractions) * remaining).toInt().coerceAtLeast(0)
+                if (s.isFraction) {
+                    tracks[i] = ((s.value / totalFractions) * remaining).toInt().coerceAtLeast(0)
                 }
             }
         }

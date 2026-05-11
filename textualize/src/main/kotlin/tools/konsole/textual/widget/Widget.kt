@@ -134,6 +134,54 @@ public abstract class Widget(
     /** Request a re-render. Default no-op; Phase 8 hooks this into the compositor's dirty list. */
     public open fun refresh() { /* Phase 8 */ }
 
+    /**
+     * Preferred ("natural") width of this widget when given [maxWidth] cells
+     * to expand into. Used by [tools.konsole.textual.layouts.GridLayout]'s
+     * `auto` column sizing to fit a track to its widest child.
+     *
+     * Default implementation renders to an in-memory [tools.konsole.rich.Console]
+     * and reports the longest rendered line's cell width. Override for cheap
+     * widget-specific estimates (e.g. a Label can return its text length
+     * directly without going through the render pipeline).
+     */
+    public open fun naturalWidth(maxWidth: Int = 80): Int = try {
+        val cw = maxWidth.coerceAtLeast(1)
+        val rendered = render().render(
+            console = tools.konsole.rich.Console.string(width = cw),
+            options = tools.konsole.rich.RenderOptions(maxWidth = cw),
+        )
+        var maxLineWidth = 0
+        var currentLine = 0
+        for (seg in rendered) {
+            for (ch in seg.text) {
+                if (ch == '\n') { if (currentLine > maxLineWidth) maxLineWidth = currentLine; currentLine = 0 }
+                else currentLine += 1
+            }
+        }
+        if (currentLine > maxLineWidth) maxLineWidth = currentLine
+        maxLineWidth.coerceIn(1, maxWidth)
+    } catch (_: Throwable) {
+        1
+    }
+
+    /**
+     * Preferred ("natural") height of this widget when given [forWidth] cells
+     * of horizontal space. Used by [tools.konsole.textual.layouts.GridLayout]'s
+     * `auto` row sizing to fit a track to its tallest child at that width.
+     */
+    public open fun naturalHeight(forWidth: Int = 80): Int = try {
+        val cw = forWidth.coerceAtLeast(1)
+        val rendered = render().render(
+            console = tools.konsole.rich.Console.string(width = cw),
+            options = tools.konsole.rich.RenderOptions(maxWidth = cw),
+        )
+        var lines = 1
+        for (seg in rendered) for (ch in seg.text) if (ch == '\n') lines += 1
+        lines.coerceAtLeast(1)
+    } catch (_: Throwable) {
+        1
+    }
+
     /** True if any of this widget's [bindings] match the [event]. */
     public fun hasBindingFor(event: tools.konsole.textual.events.Key): Boolean =
         bindings.match(event) != null
