@@ -30,7 +30,12 @@ public open class MarkdownViewer(
     public val codeTheme: SyntaxTheme = SyntaxTheme.MONOKAI,
     id: String? = null,
     classes: Set<String> = emptySet(),
-) : Widget(id, classes) {
+) : Widget(id, classes), tools.konsole.textual.widget.Scrollable {
+
+    override var scrollX: Int = 0
+    override var scrollY: Int = 0
+    override val contentWidth: Int get() = 80
+    override val contentHeight: Int get() = markdown.lines().size
 
     public var markdown: String = markdown
         private set
@@ -44,6 +49,26 @@ public open class MarkdownViewer(
         this.tableOfContents = extractToc(markdown)
         refresh()
     }
+
+    override val canFocus: Boolean get() = true
+
+    override val bindings: tools.konsole.textual.binding.BindingsMap = tools.konsole.textual.binding.BindingsMap(
+        listOf(
+            tools.konsole.textual.binding.Binding("up", "scroll_up", show = false),
+            tools.konsole.textual.binding.Binding("down", "scroll_down", show = false),
+            tools.konsole.textual.binding.Binding("pageup", "scroll_page_up", show = false),
+            tools.konsole.textual.binding.Binding("pagedown", "scroll_page_down", show = false),
+            tools.konsole.textual.binding.Binding("home", "scroll_home", show = false),
+            tools.konsole.textual.binding.Binding("end", "scroll_end", show = false),
+        )
+    )
+
+    @Suppress("unused") public fun action_scroll_up() { scrollBy(dy = -1); refresh() }
+    @Suppress("unused") public fun action_scroll_down() { scrollBy(dy = 1); refresh() }
+    @Suppress("unused") public fun action_scroll_page_up() { scrollPageUp(lastRegion?.height ?: 20); refresh() }
+    @Suppress("unused") public fun action_scroll_page_down() { scrollPageDown(lastRegion?.height ?: 20); refresh() }
+    @Suppress("unused") public fun action_scroll_home() { scrollHome(); refresh() }
+    @Suppress("unused") public fun action_scroll_end() { scrollEnd(); refresh() }
 
     override fun render(): Renderable {
         val text = Text()

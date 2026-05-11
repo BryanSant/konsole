@@ -55,5 +55,30 @@ public open class Log(
 
     public val size: Int get() = lines.size
 
+    override fun renderLine(y: Int, width: Int): tools.konsole.rich.Strip {
+        val line = lines.getOrNull(y) ?: return tools.konsole.rich.Strip.EMPTY
+        return tools.konsole.rich.Strip.of(tools.konsole.rich.Segment(line)).adjustCellLength(width)
+    }
+
+    override val canFocus: Boolean get() = true
+
+    override val bindings: tools.konsole.textual.binding.BindingsMap = tools.konsole.textual.binding.BindingsMap(
+        listOf(
+            tools.konsole.textual.binding.Binding("up", "scroll_up", show = false),
+            tools.konsole.textual.binding.Binding("down", "scroll_down", show = false),
+            tools.konsole.textual.binding.Binding("pageup", "scroll_page_up", show = false),
+            tools.konsole.textual.binding.Binding("pagedown", "scroll_page_down", show = false),
+            tools.konsole.textual.binding.Binding("home", "scroll_home", show = false),
+            tools.konsole.textual.binding.Binding("end", "scroll_end", show = false),
+        )
+    )
+
+    @Suppress("unused") public fun action_scroll_up() { scrollBy(dy = -1); refresh() }
+    @Suppress("unused") public fun action_scroll_down() { scrollBy(dy = 1); refresh() }
+    @Suppress("unused") public fun action_scroll_page_up() { scrollPageUp(lastRegion?.height ?: 10); refresh() }
+    @Suppress("unused") public fun action_scroll_page_down() { scrollPageDown(lastRegion?.height ?: 10); refresh() }
+    @Suppress("unused") public fun action_scroll_home() { scrollHome(); refresh() }
+    @Suppress("unused") public fun action_scroll_end() { scrollEnd(); refresh() }
+
     override fun render(): Renderable = Text(lines.joinToString("\n"))
 }

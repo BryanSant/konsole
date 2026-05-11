@@ -186,10 +186,17 @@ public class Compositor(initialViewport: Region) {
         p.widget.lastRegion = p.region
         val widgetWidth = p.region.width.coerceAtLeast(0)
         if (widgetWidth == 0) return
+        // For Scrollable widgets, the visible window slides over a larger
+        // content area: line `localY` of the region maps to content line
+        // `localY + scrollY` on the widget. Non-scrollable widgets see
+        // localY directly.
+        val scrollable = p.widget as? tools.konsole.textual.widget.Scrollable
+        val scrollOffset = scrollable?.scrollY ?: 0
         for (localY in 0 until p.region.height) {
             val absY = p.region.y + localY - viewport.y
             if (absY !in rows.indices) continue
-            val strip = try { p.widget.renderLine(localY, widgetWidth) } catch (_: Throwable) { Strip.EMPTY }
+            val contentY = localY + scrollOffset
+            val strip = try { p.widget.renderLine(contentY, widgetWidth) } catch (_: Throwable) { Strip.EMPTY }
             val sized = strip.adjustCellLength(widgetWidth)
             var col = 0
             for (seg in sized) {
