@@ -367,6 +367,12 @@ public abstract class App(
     /**
      * Run the app. Blocks until [exit] is called.
      * Designed to be called from `fun main()`.
+     *
+     * Terminates the JVM via [kotlin.system.exitProcess] once the run loop
+     * completes — terminal attributes have already been restored, and JLine's
+     * blocking native `read()` on stdin (running on a daemon thread JLine
+     * starts internally) can otherwise hold the process alive until the user
+     * presses a key. Override [exitProcessOnRun] to disable for embedded use.
      */
     public open fun run() {
         // `runBlocking` is intentionally NOT a child of [supervisor]: the
@@ -392,7 +398,17 @@ public abstract class App(
                 supervisor.cancel()
             }
         }
+        if (exitProcessOnRun) kotlin.system.exitProcess(0)
     }
+
+    /**
+     * Whether [run] should terminate the JVM via [kotlin.system.exitProcess]
+     * once the run loop completes. Default `true`, which gives standalone TUI
+     * apps the curses-style "return to shell immediately on quit" behaviour.
+     * Override to `false` if the App is embedded in a larger JVM process that
+     * needs to continue running.
+     */
+    public open val exitProcessOnRun: Boolean get() = true
 
     private fun pumpDriverEvents() {
         driver.events
