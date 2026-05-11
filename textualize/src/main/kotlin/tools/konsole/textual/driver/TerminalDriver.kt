@@ -59,6 +59,9 @@ public class TerminalDriver(
         if (started) return
         started = true
         rawSaved = terminal.underlying.enterRawMode()
+        // JLine's enterRawMode leaves VMIN=0/VTIME=1, which makes FileInputStream
+        // return -1 (EOF) after the 100ms timeout. Override to block on reads.
+        Terminal.fixupBlockingRawMode(terminal.underlying)
         val sb0 = StringBuilder()
         EnterAlternateScreen.writeAnsi(sb0)
         terminal.out.append(sb0)

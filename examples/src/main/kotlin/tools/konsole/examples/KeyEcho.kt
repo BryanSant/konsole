@@ -23,6 +23,7 @@ public fun main() {
     val jline = term.underlying
     System.err.println("[KeyEcho] terminal type=${jline.type} size=${jline.size}")
     val saved = jline.enterRawMode()
+    Terminal.fixupBlockingRawMode(jline)
     try {
         // Write the same enable-modes our App uses, so we capture the bytes
         // ghostty/wezterm/etc. actually emit in that mode.
