@@ -132,20 +132,22 @@ public abstract class Widget(
      * The default implementation renders [render] once and splits its
      * [Segment] stream by newline, fixing the O(N²) cost of calling the
      * legacy per-line [renderLine] N times for widgets that only produce
-     * a single [Renderable]. Override when content is indexable per-row
+     * a single [Renderable]. If a subclass overrides [renderLine] but not
+     * this method, the default detects that and dispatches per-row so the
+     * existing override is honoured (back-compat for pre-renderStrips
+     * widgets).
+     *
+     * Override directly for content with indexable per-row representation
      * (logs, tables) so rows outside the visible window aren't built.
      */
     public open fun renderStrips(width: Int, startY: Int, count: Int): List<Strip> {
         if (count <= 0) return emptyList()
-        val flat = render().render(
-            console = tools.konsole.rich.Console.string(width = width),
-            options = tools.konsole.rich.RenderOptions(maxWidth = width),
-        )
-        val lines: MutableList<MutableList<Segment>> = mutableListOf(mutableListOf())
-        for (seg in flat) {
-            if (seg.text == "\n") lines.add(mutableListOf())
-            else lines.last().add(seg)
+        if (subclassOverridesRenderLine(this::class.java)) {
+            val result = ArrayList<Strip>(count)
+            for (i in 0 until count) result += renderLine(startY + i, width)
+            return result
         }
+        val lines = renderAllLines(width)
         val result = ArrayList<Strip>(count)
         for (i in 0 until count) {
             val row = lines.getOrNull(startY + i)
@@ -156,11 +158,30 @@ public abstract class Widget(
 
     /**
      * Render a single line at [y] (0 is the top of the widget's region) as a [Strip].
-     * Convenience that delegates to [renderStrips]; the compositor uses
-     * [renderStrips] directly so the full-content render is paid once per frame.
+     *
+     * The default impl renders [render] once and slices out row [y]. The
+     * compositor uses [renderStrips] (not this), so the full-content
+     * render is paid once per frame; direct callers of [renderLine] pay
+     * it once per call.
      */
-    public open fun renderLine(y: Int, width: Int): Strip =
-        renderStrips(width, y, 1).firstOrNull() ?: Strip.EMPTY
+    public open fun renderLine(y: Int, width: Int): Strip {
+        val lines = renderAllLines(width)
+        val row = lines.getOrNull(y) ?: return Strip.EMPTY
+        return Strip.of(row).adjustCellLength(width)
+    }
+
+    private fun renderAllLines(width: Int): List<List<Segment>> {
+        val flat = render().render(
+            console = tools.konsole.rich.Console.string(width = width),
+            options = tools.konsole.rich.RenderOptions(maxWidth = width),
+        )
+        val lines: MutableList<MutableList<Segment>> = mutableListOf(mutableListOf())
+        for (seg in flat) {
+            if (seg.text == "\n") lines.add(mutableListOf())
+            else lines.last().add(seg)
+        }
+        return lines
+    }
 
     /** Request a re-render. Default no-op; Phase 8 hooks this into the compositor's dirty list. */
     public open fun refresh() { /* Phase 8 */ }
@@ -225,6 +246,21 @@ public abstract class Widget(
                 if (key and 2 != 0) add("hover")
                 if (key and 4 != 0) add("active")
                 if (key and 8 != 0) add("disabled") else add("enabled")
+            }
+        }
+
+        // Cached per concrete class: does it override renderLine? Lets the
+        // default renderStrips honour pre-renderStrips subclasses that draw
+        // their own per-row content. Look-up is O(1) after first hit.
+        private val RENDER_LINE_OVERRIDES: java.util.concurrent.ConcurrentHashMap<Class<*>, Boolean> =
+            java.util.concurrent.ConcurrentHashMap()
+
+        private fun subclassOverridesRenderLine(cls: Class<*>): Boolean = RENDER_LINE_OVERRIDES.getOrPut(cls) {
+            try {
+                val m = cls.getMethod("renderLine", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+                m.declaringClass != Widget::class.java
+            } catch (_: Throwable) {
+                false
             }
         }
     }

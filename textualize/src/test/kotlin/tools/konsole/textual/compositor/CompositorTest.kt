@@ -127,4 +127,23 @@ class CompositorTest : StringSpec({
         val l = Label("x")
         l.preferredLayer shouldBe null
     }
+
+    "compositor honours a subclass that overrides only renderLine (back-compat)" {
+        // Pre-renderStrips widgets draw via renderLine; the default renderStrips
+        // must detect the override and dispatch per row so they keep working
+        // without being migrated. Regression for the AnimationDemo BarRow shape.
+        class BarRow : Widget() {
+            override fun render(): tools.konsole.rich.Renderable = tools.konsole.rich.Text("")
+            override fun renderLine(y: Int, width: Int): tools.konsole.rich.Strip {
+                if (y != 0) return tools.konsole.rich.Strip.EMPTY
+                return tools.konsole.rich.Strip.of(
+                    tools.konsole.rich.Segment("X".repeat(width))
+                )
+            }
+        }
+        val c = Compositor(Region(0, 0, 10, 1))
+        c.placeAt(BarRow(), Region(0, 0, 10, 1))
+        val strip = c.render().first()
+        strip.segments.joinToString("") { it.text } shouldBe "XXXXXXXXXX"
+    }
 })
