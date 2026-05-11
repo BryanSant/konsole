@@ -1,17 +1,16 @@
 package tools.konsole.examples
 
-import kotlinx.coroutines.runBlocking
-import tools.konsole.core.event.KeyCode
-import tools.konsole.rich.Console
 import tools.konsole.textual.app.App
 import tools.konsole.textual.binding.bindings
+import tools.konsole.textual.css.LengthUnit
+import tools.konsole.textual.css.Scalar
 import tools.konsole.textual.driver.HeadlessDriver
-import tools.konsole.textual.events.Key
-import tools.konsole.textual.pilot.Pilot
+import tools.konsole.textual.driver.systemDriver
 import tools.konsole.textual.widget.Widget
 import tools.konsole.textual.widgets.Footer
 import tools.konsole.textual.widgets.Header
 import tools.konsole.textual.widgets.Tree
+import tools.konsole.textual.widgets.Vertical
 
 /**
  * Browse a JSON document as a [Tree]. Mirrors textual's `json_tree.py`.
@@ -21,11 +20,14 @@ import tools.konsole.textual.widgets.Tree
  * The Pilot script expands the root, walks down a few levels, and selects
  * a leaf so the demo exercises arrow + Right + Enter dispatch.
  */
-public class JsonTreeApp : App(HeadlessDriver()) {
+public class JsonTreeApp(headless: Boolean = false) : App(if (headless) HeadlessDriver() else systemDriver()) {
 
     public val tree: Tree<Any?> = Tree("food.json", rootData = null, id = "tree")
 
-    override val bindings = bindings("q" to "quit")
+    override val bindings = bindings(
+        "q" to "quit",
+        "ctrl+c" to "quit",
+    )
 
     init {
         // Build a small JSON-like structure as a hierarchy.
@@ -74,30 +76,21 @@ public class JsonTreeApp : App(HeadlessDriver()) {
     }
 
     override fun compose(): Sequence<Widget> = sequenceOf(
-        Header(title = "JSON Tree"),
-        tree,
-        Footer(this.bindings),
+        Vertical(
+            children = listOf(
+                Header(title = "JSON Tree"),
+                tree,
+                Footer(this.bindings),
+            ),
+            heights = listOf(
+                Scalar(1.0, LengthUnit.Cells),
+                Scalar(1.0, LengthUnit.Fraction),
+                Scalar(1.0, LengthUnit.Cells),
+            ),
+        )
     )
 }
 
-public fun main(): Unit = runBlocking {
-    val app = JsonTreeApp()
-    val pilot = Pilot(app)
-    pilot.use { p ->
-        p.pause(100)
-        app.renderFrame()
-
-        // Walk: ↓ to "fruits", → to expand, ↓ to first fruit, → to expand its map.
-        (app.driver as HeadlessDriver).send(Key(KeyCode.Down)); p.pause(20)
-        (app.driver as HeadlessDriver).send(Key(KeyCode.Right)); p.pause(20)
-        (app.driver as HeadlessDriver).send(Key(KeyCode.Down)); p.pause(20)
-        (app.driver as HeadlessDriver).send(Key(KeyCode.Right)); p.pause(20)
-        app.renderFrame()
-    }
-
-    val console = Console.system()
-    val driver = app.driver as HeadlessDriver
-    console.print("[bold]JsonTree demo finished.[/]")
-    console.print("Tree currently highlights: [cyan]${app.tree.currentNode()?.label ?: "<nothing>"}[/]")
-    console.print("Captured ${driver.output.length} bytes of ANSI.")
+public fun main() {
+    JsonTreeApp().run()
 }

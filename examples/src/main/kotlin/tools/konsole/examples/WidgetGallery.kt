@@ -1,15 +1,11 @@
 package tools.konsole.examples
 
-import kotlinx.coroutines.runBlocking
-import tools.konsole.core.event.KeyCode
-import tools.konsole.rich.Console
 import tools.konsole.rich.Style
 import tools.konsole.rich.Text
 import tools.konsole.textual.app.App
 import tools.konsole.textual.binding.bindings
 import tools.konsole.textual.driver.HeadlessDriver
-import tools.konsole.textual.events.Key
-import tools.konsole.textual.pilot.Pilot
+import tools.konsole.textual.driver.systemDriver
 import tools.konsole.textual.widget.Widget
 import tools.konsole.textual.widgets.Button
 import tools.konsole.textual.widgets.ButtonVariant
@@ -57,7 +53,7 @@ import tools.konsole.textual.widgets.Welcome
  * focus highlight + hover/press states, fires a Toast, then prints the
  * final captured frame size.
  */
-public class WidgetGallery : App(HeadlessDriver()) {
+public class WidgetGallery(headless: Boolean = false) : App(if (headless) HeadlessDriver() else systemDriver()) {
 
     // --- Display widgets ---
     private val display = Digits("12:34", id = "digits")
@@ -147,6 +143,7 @@ public class WidgetGallery : App(HeadlessDriver()) {
 
     override val bindings = bindings(
         "q" to "quit",
+        "ctrl+c" to "quit",
         "tab" to "focus_next",
         "shift+tab" to "focus_previous",
         "ctrl+t" to "show_toast",
@@ -173,39 +170,6 @@ public class WidgetGallery : App(HeadlessDriver()) {
     )
 }
 
-public fun main(): Unit = runBlocking {
-    val app = WidgetGallery()
-    val pilot = Pilot(app)
-    pilot.use { p ->
-        p.pause(100)
-        app.renderFrame()
-
-        // Show off focus traversal: press Tab a few times.
-        repeat(4) {
-            (app.driver as HeadlessDriver).send(Key(KeyCode.Tab))
-            p.pause(40)
-        }
-        app.renderFrame()
-
-        // Fire the toast.
-        app.action("show_toast")
-        p.pause(100)
-        app.renderFrame()
-
-        // Type into the focused input (after the tab walk it should be a focusable widget).
-        @Suppress("UNCHECKED_CAST")
-        val input = pilot.findOne("#input") as? Input
-        input?.let {
-            app.setFocus(it)
-            it.insert("Hello, world")
-            p.pause(50)
-            app.renderFrame()
-        }
-    }
-
-    val console = Console.system()
-    val driver = app.driver as HeadlessDriver
-    console.print("[bold]Widget gallery demo finished.[/]")
-    console.print("Captured ${driver.output.length} bytes of ANSI across ${app.compositor.placements.size} widget placements.")
-    console.print("[dim](Run in a real TTY to see the rendered frame.)[/]")
+public fun main() {
+    WidgetGallery().run()
 }

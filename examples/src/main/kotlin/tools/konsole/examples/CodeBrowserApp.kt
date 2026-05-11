@@ -1,19 +1,19 @@
 package tools.konsole.examples
 
 import java.io.File
-import kotlinx.coroutines.runBlocking
-import tools.konsole.core.event.KeyCode
-import tools.konsole.rich.Console
 import tools.konsole.textual.app.App
 import tools.konsole.textual.binding.bindings
+import tools.konsole.textual.css.LengthUnit
+import tools.konsole.textual.css.Scalar
 import tools.konsole.textual.driver.HeadlessDriver
-import tools.konsole.textual.events.Key
-import tools.konsole.textual.pilot.Pilot
+import tools.konsole.textual.driver.systemDriver
 import tools.konsole.textual.widget.Widget
 import tools.konsole.textual.widgets.DirectoryTree
 import tools.konsole.textual.widgets.Footer
 import tools.konsole.textual.widgets.Header
+import tools.konsole.textual.widgets.Horizontal
 import tools.konsole.textual.widgets.Log
+import tools.konsole.textual.widgets.Vertical
 
 /**
  * Filesystem explorer with a [DirectoryTree] sidebar and a [Log] preview
@@ -24,13 +24,17 @@ import tools.konsole.textual.widgets.Log
  * The Pilot script navigates into the konsole project root and previews
  * the README.md content.
  */
-public class CodeBrowserApp(rootPath: String) : App(HeadlessDriver()) {
+public class CodeBrowserApp(
+    rootPath: String,
+    headless: Boolean = false,
+) : App(if (headless) HeadlessDriver() else systemDriver()) {
 
     public val tree: DirectoryTree = DirectoryTree(rootPath, id = "tree")
     public val preview: Log = Log(maxLines = 200, id = "preview")
 
     override val bindings = bindings(
         "q" to "quit",
+        "ctrl+c" to "quit",
         "enter" to "open_file",
     )
 
@@ -66,39 +70,34 @@ public class CodeBrowserApp(rootPath: String) : App(HeadlessDriver()) {
     }
 
     override fun compose(): Sequence<Widget> = sequenceOf(
-        Header(title = "Code browser: ${File(tree.rootPath).name}"),
-        tree,
-        preview,
-        Footer(this.bindings),
+        Vertical(
+            children = listOf(
+                Header(title = "Code browser: ${File(tree.rootPath).name}"),
+                // Split body: tree sidebar on left, preview pane on right.
+                Horizontal(
+                    children = listOf(tree, preview),
+                    widths = listOf(
+                        Scalar(30.0, LengthUnit.Cells),       // sidebar
+                        Scalar(1.0, LengthUnit.Fraction),     // preview fills the rest
+                    ),
+                ),
+                Footer(this.bindings),
+            ),
+            heights = listOf(
+                Scalar(1.0, LengthUnit.Cells),
+                Scalar(1.0, LengthUnit.Fraction),
+                Scalar(1.0, LengthUnit.Cells),
+            ),
+        )
     )
+
+    override fun start() {
+        super.start()
+        if (focused !== tree) setFocus(tree)
+    }
 }
 
-public fun main(): Unit = runBlocking {
+public fun main() {
     val rootPath = System.getProperty("user.dir")
-    val app = CodeBrowserApp(rootPath)
-    val pilot = Pilot(app)
-    pilot.use { p ->
-        p.pause(100)
-        app.renderFrame()
-
-        // Walk to README.md if present.
-        val readmeNode = app.tree.root.children.firstOrNull { it.data?.name == "README.md" }
-        if (readmeNode != null) {
-            // Highlight the README; the Tree.Highlighted message wires the preview.
-            val idx = app.tree.root.children.indexOf(readmeNode) + 1  // +1 for root row
-            repeat(idx) {
-                (app.driver as HeadlessDriver).send(Key(KeyCode.Down))
-                p.pause(15)
-            }
-            (app.driver as HeadlessDriver).send(Key(KeyCode.Enter))
-            p.pause(80)
-            app.renderFrame()
-        }
-    }
-
-    val console = Console.system()
-    val driver = app.driver as HeadlessDriver
-    console.print("[bold]Code browser demo finished.[/]")
-    console.print("Preview pane has [cyan]${app.preview.size}[/] lines loaded.")
-    console.print("Captured ${driver.output.length} bytes of ANSI.")
+    CodeBrowserApp(rootPath).run()
 }

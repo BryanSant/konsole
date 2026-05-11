@@ -1,19 +1,18 @@
 package tools.konsole.examples
 
-import kotlinx.coroutines.runBlocking
-import tools.konsole.core.event.KeyCode
-import tools.konsole.rich.Console
 import tools.konsole.textual.app.App
 import tools.konsole.textual.binding.bindings
+import tools.konsole.textual.css.LengthUnit
+import tools.konsole.textual.css.Scalar
 import tools.konsole.textual.driver.HeadlessDriver
-import tools.konsole.textual.events.Key
-import tools.konsole.textual.pilot.Pilot
+import tools.konsole.textual.driver.systemDriver
 import tools.konsole.textual.widget.Widget
 import tools.konsole.textual.widgets.Footer
 import tools.konsole.textual.widgets.Header
 import tools.konsole.textual.widgets.Label
 import tools.konsole.textual.widgets.TabPane
 import tools.konsole.textual.widgets.TabbedContent
+import tools.konsole.textual.widgets.Vertical
 
 /**
  * Showcases [TabbedContent]. Three tabs ("Overview", "Stats", "About") cycle
@@ -24,7 +23,7 @@ import tools.konsole.textual.widgets.TabbedContent
  * The bundled Pilot script walks left/right through the tabs once, then
  * prints the final captured frame size.
  */
-public class TabbedContentDemo : App(HeadlessDriver()) {
+public class TabbedContentDemo(headless: Boolean = false) : App(if (headless) HeadlessDriver() else systemDriver()) {
 
     private val tabbed = TabbedContent(
         panes = listOf(
@@ -49,6 +48,7 @@ public class TabbedContentDemo : App(HeadlessDriver()) {
 
     override val bindings = bindings(
         "q" to "quit",
+        "ctrl+c" to "quit",
         "left" to "previous_tab",
         "right" to "next_tab",
     )
@@ -63,37 +63,23 @@ public class TabbedContentDemo : App(HeadlessDriver()) {
     @Suppress("unused") public fun action_next_tab() { tabbed.tabs.nextTab(); requestRefresh() }
 
     override fun compose(): Sequence<Widget> = sequenceOf(
-        Header(title = "TabbedContent demo"),
-        tabbed,
-        Footer(this.bindings),
+        Vertical(
+            children = listOf(
+                Header(title = "TabbedContent demo"),
+                tabbed,
+                Footer(this.bindings),
+            ),
+            heights = listOf(
+                Scalar(1.0, LengthUnit.Cells),
+                Scalar(1.0, LengthUnit.Fraction),
+                Scalar(1.0, LengthUnit.Cells),
+            ),
+        )
     )
 
     public val activeTabId: String? get() = tabbed.tabs.activeTabId
 }
 
-public fun main(): Unit = runBlocking {
-    val app = TabbedContentDemo()
-    val pilot = Pilot(app)
-    pilot.use { p ->
-        p.pause(100)
-        app.renderFrame()
-
-        val driver = app.driver as HeadlessDriver
-        // Cycle through every tab using the Right binding.
-        repeat(3) {
-            driver.send(Key(KeyCode.Right))
-            p.pause(40)
-            app.renderFrame()
-        }
-        // And one Left for good measure.
-        driver.send(Key(KeyCode.Left))
-        p.pause(40)
-        app.renderFrame()
-    }
-
-    val console = Console.system()
-    val driver = app.driver as HeadlessDriver
-    console.print("[bold]TabbedContent demo finished.[/]")
-    console.print("Final active tab: [bold cyan]${app.activeTabId}[/]")
-    console.print("Captured ${driver.output.length} bytes of ANSI.")
+public fun main() {
+    TabbedContentDemo().run()
 }

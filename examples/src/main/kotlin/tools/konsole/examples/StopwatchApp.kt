@@ -1,19 +1,19 @@
 package tools.konsole.examples
 
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
-import tools.konsole.rich.Console
 import tools.konsole.textual.app.App
 import tools.konsole.textual.binding.bindings
+import tools.konsole.textual.css.LengthUnit
+import tools.konsole.textual.css.Scalar
 import tools.konsole.textual.driver.HeadlessDriver
-import tools.konsole.textual.message.Message
-import tools.konsole.textual.pilot.Pilot
+import tools.konsole.textual.driver.systemDriver
 import tools.konsole.textual.widget.Widget
 import tools.konsole.textual.widgets.Button
 import tools.konsole.textual.widgets.ButtonVariant
 import tools.konsole.textual.widgets.Digits
 import tools.konsole.textual.widgets.Footer
 import tools.konsole.textual.widgets.Header
+import tools.konsole.textual.widgets.Horizontal
+import tools.konsole.textual.widgets.Vertical
 
 /**
  * The canonical Stopwatch demo — Digits clock with Start / Stop / Reset.
@@ -25,7 +25,7 @@ import tools.konsole.textual.widgets.Header
  * Output is captured via the [HeadlessDriver] and the final screen is
  * printed at the end so you see the rendered frames in your terminal.
  */
-public class StopwatchApp : App(HeadlessDriver()) {
+public class StopwatchApp(headless: Boolean = false) : App(if (headless) HeadlessDriver() else systemDriver()) {
 
     private val display = Digits("00:00.0", id = "display")
     private val startBtn = Button("Start", variant = ButtonVariant.Success, id = "start")
@@ -37,20 +37,33 @@ public class StopwatchApp : App(HeadlessDriver()) {
 
     override val bindings = bindings(
         "q" to "quit",
+        "ctrl+c" to "quit",
         "s" to "start",
         "p" to "stop",
         "r" to "reset",
     )
 
+    @Suppress("unused") public fun action_start() { startTimer() }
+    @Suppress("unused") public fun action_stop() { stopTimer() }
+    @Suppress("unused") public fun action_reset() { resetTimer() }
+
     override val tickIntervalMs: Long = 100L  // tenth-of-second display granularity
 
     override fun compose(): Sequence<Widget> = sequenceOf(
-        Header(title = "Stopwatch"),
-        display,
-        startBtn,
-        stopBtn,
-        resetBtn,
-        Footer(this.bindings),
+        Vertical(
+            children = listOf(
+                Header(title = "Stopwatch"),
+                display,
+                Horizontal(startBtn, stopBtn, resetBtn),  // 3 buttons sharing a row
+                Footer(this.bindings),
+            ),
+            heights = listOf(
+                Scalar(1.0, LengthUnit.Cells),       // header
+                Scalar(5.0, LengthUnit.Cells),       // Digits font is 5 rows tall
+                Scalar(1.0, LengthUnit.Fraction),    // button row absorbs remaining space
+                Scalar(1.0, LengthUnit.Cells),       // footer
+            ),
+        )
     )
 
     init {
@@ -83,43 +96,6 @@ public class StopwatchApp : App(HeadlessDriver()) {
     }
 }
 
-public fun main(): Unit = runBlocking {
-    val app = StopwatchApp()
-    val pilot = Pilot(app)
-    pilot.use { p ->
-        // Initial frame
-        p.pause(200)
-        app.renderFrame()
-
-        // Click Start, watch it tick for 800ms (~ 0.8 seconds elapsed)
-        @Suppress("UNCHECKED_CAST")
-        val start = pilot.findOne("#start") as? Button ?: error("missing #start")
-        start.press()
-        p.pause(800)
-        app.renderFrame()
-
-        // Stop the clock
-        @Suppress("UNCHECKED_CAST")
-        val stop = pilot.findOne("#stop") as? Button ?: error("missing #stop")
-        stop.press()
-        p.pause(200)
-        app.renderFrame()
-
-        // Reset
-        @Suppress("UNCHECKED_CAST")
-        val reset = pilot.findOne("#reset") as? Button ?: error("missing #reset")
-        reset.press()
-        p.pause(200)
-        app.renderFrame()
-    }
-
-    // Print the captured driver output so you can see the rendered frames.
-    val console = Console.system()
-    console.print("[bold]Stopwatch demo finished.[/]")
-    console.print("[dim]Captured driver output (last frame):[/]")
-    console.writer.write(app.driver.toString())
-    console.writer.write("\n")
-    val driver = app.driver as HeadlessDriver
-    console.writer.write(driver.output)
-    console.writer.flush()
+public fun main() {
+    StopwatchApp().run()
 }
