@@ -25,7 +25,9 @@ dependencies {
 
 tasks.register<JavaExec>("runExample") {
     group = "application"
-    description = "Run an example: ./gradlew :examples:runExample -Pexample=HelloKonsole"
+    description = "Run an example: ./gradlew :examples:runExample -Pexample=HelloKonsole. " +
+        "WARNING: Gradle's JavaExec cannot pass a controlling TTY to the child JVM, so " +
+        "demos that need a real terminal (systemDriver) will see size 0x0. Use ./demo.sh instead."
     classpath = sourceSets.main.get().runtimeClasspath
     val name = providers.gradleProperty("example").orElse("HelloKonsole")
     mainClass.set(name.map { n ->
@@ -37,4 +39,13 @@ tasks.register<JavaExec>("runExample") {
         "-Dorg.jline.terminal.provider=ffm",
     )
     standardInput = System.`in`
+}
+
+// Print the runtime classpath so a shell launcher can `exec java` directly,
+// preserving the calling terminal's TTY (Gradle's JavaExec can't do this).
+tasks.register("printRuntimeClasspath") {
+    group = "application"
+    description = "Print the runtime classpath for the examples module."
+    val cp = sourceSets.main.get().runtimeClasspath
+    doLast { println(cp.asPath) }
 }

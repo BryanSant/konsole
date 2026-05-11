@@ -5,8 +5,12 @@
 #   ./demo.sh PrideApp         → run PrideApp interactively
 #   ./demo.sh Pride            → same (suffix optional)
 #
-# Demos that need a real terminal (those using systemDriver) take over the
-# screen and block until you quit them (usually 'q' or Ctrl+C).
+# Why this script exists instead of `./gradlew :examples:runExample`:
+# Gradle's JavaExec task captures stdin/stdout and does not pass the
+# controlling terminal through to the child JVM. JLine FFM then reports
+# `dumb` terminal type and size 0x0, breaking every interactive demo.
+# This launcher uses Gradle only to compile + assemble the classpath, then
+# `exec java` directly so the JVM inherits the calling shell's TTY.
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -50,4 +54,22 @@ if [ -z "$RESOLVED" ]; then
     exit 1
 fi
 
-exec ./gradlew --console=plain -q ":examples:runExample" -Pexample="$RESOLVED"
+# Compile so the runtime classpath references real .class files, then ask
+# Gradle to print it. The cached path is reused on repeat runs.
+CLASSPATH_CACHE="examples/build/runtimeClasspath.txt"
+if [ ! -f "$CLASSPATH_CACHE" ] \
+   || [ "$EXAMPLES_DIR" -nt "$CLASSPATH_CACHE" ] \
+   || [ -n "$(find core/src rich/src textualize/src "$EXAMPLES_DIR" -newer "$CLASSPATH_CACHE" -name '*.kt' -print -quit 2>/dev/null)" ]; then
+    ./gradlew --console=plain -q :examples:assemble
+    ./gradlew --console=plain -q :examples:printRuntimeClasspath > "$CLASSPATH_CACHE"
+fi
+
+CLASSPATH="$(cat "$CLASSPATH_CACHE")"
+MAIN_CLASS="tools.konsole.examples.${RESOLVED}Kt"
+
+# Exec into java directly so the JVM inherits the calling shell's TTY.
+exec java \
+    --enable-native-access=ALL-UNNAMED \
+    -Dorg.jline.terminal.provider=ffm \
+    -cp "$CLASSPATH" \
+    "$MAIN_CLASS"
