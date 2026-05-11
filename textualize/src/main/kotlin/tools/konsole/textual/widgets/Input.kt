@@ -78,7 +78,11 @@ public open class Input(
      */
     override suspend fun onEvent(event: tools.konsole.textual.events.Event) {
         if (event !is tools.konsole.textual.events.Key) return
-        if (event.modifiers.bits != 0) return  // bindings handle modifiers
+        // Shift alone is fine — that's just a capital letter or shifted
+        // symbol. Reject Ctrl / Alt / Super / Hyper / Meta so binding-driven
+        // shortcuts (Ctrl+C, Alt+F, …) still fall through to the App.
+        val mods = event.modifiers
+        if (mods.hasControl() || mods.hasAlt() || mods.hasSuper() || mods.hasHyper() || mods.hasMeta()) return
         val code = event.code
         if (code is tools.konsole.core.event.KeyCode.Char) {
             // Skip ASCII control range; everything else inserts.

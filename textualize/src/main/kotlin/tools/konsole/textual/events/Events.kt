@@ -47,8 +47,27 @@ public data class Key(
             direct || (c.c == ' ' && key == "space") || (c.c == '\t' && key == "tab")
         }
         is KeyCode.F -> "f${c.n}" == key
-        else -> c::class.simpleName?.lowercase() == key
+        else -> {
+            val className = c::class.simpleName?.lowercase()
+            // Exact-class-name match plus a small alias table for keys whose
+            // textual binding string convention differs from the class name.
+            className == key || keyAliases[key] == className
+        }
     }
+
+    private val keyAliases: Map<String, String> = mapOf(
+        "escape" to "esc",
+        "esc" to "escape",          // tolerant either way
+        "return" to "enter",
+        "del" to "delete",
+        "ins" to "insert",
+        "page_up" to "pageup",
+        "page_down" to "pagedown",
+        "pgup" to "pageup",
+        "pgdn" to "pagedown",
+        "back_tab" to "backtab",
+        "shift_tab" to "backtab",
+    )
 }
 
 /**
