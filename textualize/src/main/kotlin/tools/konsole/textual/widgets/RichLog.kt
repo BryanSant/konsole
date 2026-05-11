@@ -76,6 +76,8 @@ public open class RichLog(
         listOf(
             tools.konsole.textual.binding.Binding("up", "scroll_up", show = false),
             tools.konsole.textual.binding.Binding("down", "scroll_down", show = false),
+            tools.konsole.textual.binding.Binding("left", "scroll_left", show = false),
+            tools.konsole.textual.binding.Binding("right", "scroll_right", show = false),
             tools.konsole.textual.binding.Binding("pageup", "scroll_page_up", show = false),
             tools.konsole.textual.binding.Binding("pagedown", "scroll_page_down", show = false),
             tools.konsole.textual.binding.Binding("home", "scroll_home", show = false),
@@ -85,6 +87,8 @@ public open class RichLog(
 
     @Suppress("unused") public fun action_scroll_up() { scrollBy(dy = -1); refresh() }
     @Suppress("unused") public fun action_scroll_down() { scrollBy(dy = 1); refresh() }
+    @Suppress("unused") public fun action_scroll_left() { scrollBy(dx = -2); refresh() }
+    @Suppress("unused") public fun action_scroll_right() { scrollBy(dx = 2); refresh() }
     @Suppress("unused") public fun action_scroll_page_up() { scrollPageUp(lastRegion?.height ?: 10); refresh() }
     @Suppress("unused") public fun action_scroll_page_down() { scrollPageDown(lastRegion?.height ?: 10); refresh() }
     @Suppress("unused") public fun action_scroll_home() { scrollHome(); refresh() }
