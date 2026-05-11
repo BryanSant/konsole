@@ -85,6 +85,13 @@ public open class OptionList(
         return post(Selected(this, highlightedIndex, options[highlightedIndex].first))
     }
 
+    // Binding-dispatched actions
+    @Suppress("unused") public fun action_cursor_up() { moveCursor(-1) }
+    @Suppress("unused") public fun action_cursor_down() { moveCursor(1) }
+    @Suppress("unused") public fun action_cursor_top() { highlight(0) }
+    @Suppress("unused") public fun action_cursor_bottom() { highlight(options.size - 1) }
+    @Suppress("unused") public fun action_select() { selectCurrent() }
+
     override fun render(): Renderable {
         val text = Text()
         for ((i, option) in options.withIndex()) {
@@ -234,6 +241,10 @@ public open class ListView(
     }
 
     public fun selectCurrent(): Boolean = post(Selected(this, highlightedIndex))
+
+    @Suppress("unused") public fun action_cursor_up() { moveCursor(-1) }
+    @Suppress("unused") public fun action_cursor_down() { moveCursor(1) }
+    @Suppress("unused") public fun action_select() { selectCurrent() }
 
     override fun render(): Renderable {
         val text = Text()

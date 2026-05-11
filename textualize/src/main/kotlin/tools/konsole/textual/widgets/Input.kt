@@ -61,6 +61,35 @@ public open class Input(
         )
     )
 
+    // Binding-dispatched actions
+    @Suppress("unused") public fun action_cursor_left() { moveCursor(-1) }
+    @Suppress("unused") public fun action_cursor_right() { moveCursor(1) }
+    @Suppress("unused") public fun action_cursor_home() { moveCursorTo(0) }
+    @Suppress("unused") public fun action_cursor_end() { moveCursorTo(value.length) }
+    @Suppress("unused") public fun action_delete_left() { deleteLeft() }
+    @Suppress("unused") public fun action_delete_right() { deleteRight() }
+    @Suppress("unused") public fun action_submit() { submit() }
+
+    /**
+     * Intercept Key events the focused-widget path delivers. Printable chars
+     * → [insert]; navigation/edit keys are routed via their binding actions
+     * by the App, but we also handle them here when the widget receives raw
+     * Key events directly (e.g. before any binding lookup ran).
+     */
+    override suspend fun onEvent(event: tools.konsole.textual.events.Event) {
+        if (event !is tools.konsole.textual.events.Key) return
+        if (event.modifiers.bits != 0) return  // bindings handle modifiers
+        val code = event.code
+        if (code is tools.konsole.core.event.KeyCode.Char) {
+            // Skip ASCII control range; everything else inserts.
+            val ch = code.c
+            if (ch.code >= 0x20 && ch.code != 0x7F) {
+                insert(ch.toString())
+                event.stop()
+            }
+        }
+    }
+
     /** Insert [text] at the cursor. Fires [Changed]. */
     public open fun insert(text: String) {
         if (maxLength != null && value.length + text.length > maxLength) return

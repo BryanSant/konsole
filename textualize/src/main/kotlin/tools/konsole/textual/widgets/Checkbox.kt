@@ -42,6 +42,10 @@ public open class Checkbox(
         refresh()
     }
 
+    /** Binding-dispatched action: alias for [toggle]. */
+    @Suppress("unused")
+    public fun action_toggle() { toggle() }
+
     public fun set(newValue: Boolean) {
         if (newValue == value) return
         value = newValue

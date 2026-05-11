@@ -75,8 +75,13 @@ public open class MessagePump(
         registerHandler(M::class, handler)
     }
 
-    /** Override to intercept events before generic dispatch. Default is no-op. */
-    protected open suspend fun onEvent(event: tools.konsole.textual.events.Event) {}
+    /**
+     * Override to intercept events before generic dispatch. Default is no-op.
+     *
+     * Public so the App can deliver Key events to the focused widget
+     * synchronously, preserving order against binding-action dispatch.
+     */
+    public open suspend fun onEvent(event: tools.konsole.textual.events.Event) {}
 
     /** Schedule [block] to run after [millis]. Returns the launched [Job] so it can be cancelled. */
     public fun setTimer(millis: Long, block: suspend () -> Unit): Job = scope.launch {

@@ -316,13 +316,11 @@ public abstract class App(
 
     private fun pumpDriverEvents() {
         driver.events
-            .onEach { e ->
-                handleEvent(e)
-            }
+            .onEach { e -> handleEvent(e) }
             .launchIn(rootScope)
     }
 
-    private fun handleEvent(event: Event) {
+    private suspend fun handleEvent(event: Event) {
         when (event) {
             is Resize -> {
                 screenWidth = event.columns
@@ -383,8 +381,15 @@ public abstract class App(
                         if (match.action == "quit") exit()
                     }
                 } else {
-                    // Forward to focused widget first, then screen.
-                    focused?.post(event) ?: currentScreen?.post(event)
+                    // Forward to focused widget first, synchronously, so order
+                    // is preserved against binding-action dispatch. If the
+                    // widget consumes the event (event.stop()), we stop.
+                    val target = focused
+                    if (target != null) {
+                        target.onEvent(event)
+                    } else {
+                        currentScreen?.post(event)
+                    }
                 }
                 dirty = true
             }

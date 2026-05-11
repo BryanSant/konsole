@@ -29,7 +29,10 @@ public data class Key(
         return keyMatches(code, keyPart)
     }
     private fun keyMatches(c: KeyCode, key: String): Boolean = when (c) {
-        is KeyCode.Char -> c.c.lowercaseChar().toString() == key
+        is KeyCode.Char -> {
+            val direct = c.c.lowercaseChar().toString() == key
+            direct || (c.c == ' ' && key == "space") || (c.c == '\t' && key == "tab")
+        }
         is KeyCode.F -> "f${c.n}" == key
         else -> c::class.simpleName?.lowercase() == key
     }

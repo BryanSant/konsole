@@ -46,6 +46,10 @@ public open class Button(
     /** Programmatically press the button — posts a [Pressed] message. */
     public fun press(): Boolean = post(Pressed(this))
 
+    /** Binding-dispatched action: same as [press]. Called when `enter` or `space` fires. */
+    @Suppress("unused")
+    public fun action_press() { press() }
+
     override fun render(): Renderable {
         val text = Markup.parse(label)
         return Align(text, align = Justify.Center, style = styleFor(variant, disabled, isHovered, isPressed))

@@ -69,6 +69,14 @@ public open class Tree<T>(
         return post(Selected(this, node))
     }
 
+    // Binding-dispatched actions
+    @Suppress("unused") public fun action_cursor_up() { moveCursor(-1) }
+    @Suppress("unused") public fun action_cursor_down() { moveCursor(1) }
+    @Suppress("unused") public fun action_expand() { expandCurrent() }
+    @Suppress("unused") public fun action_collapse() { collapseCurrent() }
+    @Suppress("unused") public fun action_toggle_expand() { toggleExpand() }
+    @Suppress("unused") public fun action_select() { selectCurrent() }
+
     private fun visibleNodes(): List<Node<T>> {
         val out = mutableListOf<Node<T>>()
         fun walk(n: Node<T>) {

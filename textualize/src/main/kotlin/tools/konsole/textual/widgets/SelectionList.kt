@@ -87,6 +87,13 @@ public open class SelectionList(
         refresh()
     }
 
+    // Binding-dispatched actions
+    @Suppress("unused") public fun action_cursor_up() { moveCursor(-1) }
+    @Suppress("unused") public fun action_cursor_down() { moveCursor(1) }
+    @Suppress("unused") public fun action_toggle() { toggleCurrent() }
+    @Suppress("unused") public fun action_select_all() { selectAll() }
+    @Suppress("unused") public fun action_deselect_all() { deselectAll() }
+
     override fun render(): Renderable {
         val text = Text()
         for ((i, opt) in options.withIndex()) {

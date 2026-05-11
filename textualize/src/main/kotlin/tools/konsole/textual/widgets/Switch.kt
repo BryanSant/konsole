@@ -44,6 +44,10 @@ public open class Switch(
         refresh()
     }
 
+    /** Binding-dispatched action: alias for [toggle]. */
+    @Suppress("unused")
+    public fun action_toggle() { toggle() }
+
     /** Set [value] explicitly. Posts [Changed] only if the value differs. */
     public fun set(newValue: Boolean) {
         if (newValue == value) return

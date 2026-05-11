@@ -169,6 +169,37 @@ public open class TextArea(
         )
     )
 
+    // Binding-dispatched actions
+    @Suppress("unused") public fun action_cursor_up() { moveCursorUp() }
+    @Suppress("unused") public fun action_cursor_down() { moveCursorDown() }
+    @Suppress("unused") public fun action_cursor_left() { moveCursorLeft() }
+    @Suppress("unused") public fun action_cursor_right() { moveCursorRight() }
+    @Suppress("unused") public fun action_cursor_line_start() { moveCursorLineStart() }
+    @Suppress("unused") public fun action_cursor_line_end() { moveCursorLineEnd() }
+    @Suppress("unused") public fun action_cursor_document_start() { moveCursorDocumentStart() }
+    @Suppress("unused") public fun action_cursor_document_end() { moveCursorDocumentEnd() }
+    @Suppress("unused") public fun action_delete_left() { deleteLeft() }
+    @Suppress("unused") public fun action_delete_right() { deleteRight() }
+    @Suppress("unused") public fun action_newline() { insert("\n") }
+
+    /**
+     * Intercept printable Key events as character insertion. Navigation and
+     * editing keys flow through bindings → actions instead.
+     */
+    override suspend fun onEvent(event: tools.konsole.textual.events.Event) {
+        if (readOnly) return
+        if (event !is tools.konsole.textual.events.Key) return
+        if (event.modifiers.bits != 0) return
+        val code = event.code
+        if (code is tools.konsole.core.event.KeyCode.Char) {
+            val ch = code.c
+            if (ch.code >= 0x20 && ch.code != 0x7F) {
+                insert(ch.toString())
+                event.stop()
+            }
+        }
+    }
+
     /** Text content of the document. */
     public val text: String get() = document.text
 
