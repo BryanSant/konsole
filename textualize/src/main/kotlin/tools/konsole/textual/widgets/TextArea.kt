@@ -4,6 +4,9 @@ import tools.konsole.core.style.Color
 import tools.konsole.rich.Renderable
 import tools.konsole.rich.Style
 import tools.konsole.rich.Text
+import tools.konsole.rich.syntax.SyntaxTheme
+import tools.konsole.rich.syntax.Token
+import tools.konsole.rich.syntax.TreeSitterLanguages
 import tools.konsole.textual.binding.Binding
 import tools.konsole.textual.binding.BindingsMap
 import tools.konsole.textual.message.Message
@@ -134,11 +137,49 @@ public open class TextArea(
     initial: String = "",
     public val readOnly: Boolean = false,
     public val showLineNumbers: Boolean = false,
+    /**
+     * Optional tree-sitter language for syntax highlighting. Accepted names
+     * are the same aliases [TreeSitterLanguages.byName] understands —
+     * `"kotlin"`, `"kt"`, `"java"`, `"python"`, `"py"`, `"json"`, `"bash"`,
+     * `"sh"`, etc. Pass `null` (the default) for a plain text editor.
+     */
+    public val language: String? = null,
+    /**
+     * Color scheme for syntax tokens. Defaults to the dark ANSI theme;
+     * pass a custom theme to override colours or backgrounds.
+     */
+    public val syntaxTheme: SyntaxTheme = SyntaxTheme.ANSI_DARK,
     id: String? = null,
     classes: Set<String> = emptySet(),
 ) : Widget(id, classes), Scrollable {
 
     public val document: Document = Document(initial)
+
+    /** Tree-sitter lexer for [language], or null if no highlighting requested. */
+    private val lexer = language?.let { TreeSitterLanguages.byName(it) }
+
+    /** Cache: per-character style indexed by document-wide char offset. */
+    private var tokenStyleCache: Array<Style?>? = null
+    private var tokenStyleCacheText: String? = null
+
+    private fun ensureTokenStyles(text: String): Array<Style?>? {
+        val lex = lexer ?: return null
+        if (tokenStyleCacheText === text && tokenStyleCache != null) return tokenStyleCache
+        val styles = arrayOfNulls<Style>(text.length)
+        try {
+            for (tok in lex.tokenize(text)) {
+                val s = syntaxTheme[tok.type]
+                if (s === Style.NULL) continue
+                val end = tok.end.coerceAtMost(text.length)
+                for (i in tok.start until end) styles[i] = s
+            }
+        } catch (_: Throwable) {
+            return null  // lexer failed (e.g. native lib missing) — fall back to plain
+        }
+        tokenStyleCache = styles
+        tokenStyleCacheText = text
+        return styles
+    }
 
     public var cursor: Location = Location.ZERO
         private set
@@ -314,6 +355,13 @@ public open class TextArea(
         val gutterStyle = Style(color = Color.DarkGrey, dim = true)
         val gutterWidth = if (showLineNumbers) document.lineCount.toString().length + 1 else 0
 
+        // Compute per-char syntax-token styles for the whole document up front.
+        // Map a (row, col) location to the corresponding global char offset so
+        // we can look up the syntax style.
+        val fullText = document.text
+        val syntaxStyles = ensureTokenStyles(fullText)
+        var globalOffset = 0
+
         for (rowIdx in 0 until document.lineCount) {
             if (showLineNumbers) {
                 text.append("${(rowIdx + 1).toString().padStart(gutterWidth - 1)} ", gutterStyle)
@@ -325,18 +373,24 @@ public open class TextArea(
                 val isSelected = here in selStart..selEnd && !selection.isCollapsed
                 if (colIdx < line.length) {
                     val ch = line[colIdx].toString()
+                    val syntaxStyle = syntaxStyles?.getOrNull(globalOffset)
                     val style = when {
                         isCursor -> cursorStyle
                         isSelected -> Style(bgcolor = Color.Blue)
+                        syntaxStyle != null -> syntaxStyle
                         else -> Style.NULL
                     }
                     text.append(ch, style)
+                    globalOffset += 1
                 } else if (isCursor) {
                     // Cursor at end-of-line: render a blank cursor block.
                     text.append(" ", cursorStyle)
                 }
             }
-            if (rowIdx < document.lineCount - 1) text.append("\n")
+            if (rowIdx < document.lineCount - 1) {
+                text.append("\n")
+                globalOffset += 1  // newline byte in the joined document text
+            }
         }
         return text
     }

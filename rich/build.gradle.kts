@@ -30,9 +30,29 @@ dependencies {
     implementation(libs.commonmark)
     implementation(libs.commonmark.gfm.tables)
 
+    // Tree-sitter — used by TreeSitterLexer for syntax highlighting in
+    // TextArea / Syntax. compileOnly + runtimeOnly so the native libs are
+    // available when used but consumers who don't touch syntax highlighting
+    // don't pay the ~30MB native-library cost.
+    compileOnly(libs.treesitter)
+    runtimeOnly(libs.treesitter)
+    runtimeOnly(libs.treesitter.kotlin)
+    runtimeOnly(libs.treesitter.java)
+    runtimeOnly(libs.treesitter.python)
+    runtimeOnly(libs.treesitter.json)
+    runtimeOnly(libs.treesitter.bash)
+    runtimeOnly(libs.treesitter.markdown)
+
     testImplementation(libs.kotest.runner.junit5)
     testImplementation(libs.kotest.property)
     testImplementation(libs.kotest.assertions.core)
+    testImplementation(libs.treesitter)
+    testImplementation(libs.treesitter.kotlin)
+    testImplementation(libs.treesitter.java)
+    testImplementation(libs.treesitter.python)
+    testImplementation(libs.treesitter.json)
+    testImplementation(libs.treesitter.bash)
+    testImplementation(libs.treesitter.markdown)
 }
 
 testing {
