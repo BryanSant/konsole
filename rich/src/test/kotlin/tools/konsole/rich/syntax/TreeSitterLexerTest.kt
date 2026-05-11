@@ -36,13 +36,34 @@ class TreeSitterLexerTest : StringSpec({
         TreeSitterLanguages.byName("brainfuck") shouldBe null
     }
 
-    "byName resolves the five canonical-source-code grammars" {
+    "byName resolves the canonical-source-code grammars" {
         // Markdown is currently excluded — tree-sitter-markdown 0.7.1 has an
         // ABI mismatch with the 0.26.x core lib bundled in the binding.
         // Add it back once a newer markdown grammar release is available.
-        val supported = listOf("kt", "kotlin", "py", "python", "java", "json", "bash", "sh")
+        val supported = listOf(
+            "kt", "kotlin", "py", "python", "java", "json", "bash", "sh",
+            "javascript", "js", "typescript", "ts", "rust", "rs",
+            "go", "golang", "yaml", "yml", "toml",
+        )
         for (name in supported) {
             (TreeSitterLanguages.byName(name) != null) shouldBe true
         }
+    }
+
+    "tokenize a small Rust snippet" {
+        val lexer = TreeSitterLanguages.rust()
+        val source = "fn greet(name: &str) -> String { format!(\"hi, {}\", name) }"
+        val types = lexer.tokenize(source).map { it.type }.toSet()
+        types shouldContain TokenType.KEYWORD       // fn
+        types shouldContain TokenType.KEYWORD_TYPE  // str / String
+        types shouldContain TokenType.STRING        // "hi, {}"
+    }
+
+    "tokenize a small TypeScript snippet" {
+        val lexer = TreeSitterLanguages.typescript()
+        val source = "const x: number = 42; type T = string | null;"
+        val types = lexer.tokenize(source).map { it.type }.toSet()
+        types shouldContain TokenType.KEYWORD       // const / type
+        types shouldContain TokenType.KEYWORD_TYPE  // number, string
     }
 })

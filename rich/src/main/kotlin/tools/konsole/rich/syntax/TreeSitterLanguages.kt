@@ -52,6 +52,42 @@ public object TreeSitterLanguages {
         tokenTypeMap = MARKDOWN_TOKEN_MAP,
     )
 
+    /** Tree-sitter–powered JavaScript lexer. */
+    public fun javascript(): TreeSitterLexer = TreeSitterLexer(
+        language = loadLanguage("org.treesitter.TreeSitterJavascript"),
+        tokenTypeMap = JAVASCRIPT_TOKEN_MAP,
+    )
+
+    /** Tree-sitter–powered TypeScript lexer. */
+    public fun typescript(): TreeSitterLexer = TreeSitterLexer(
+        language = loadLanguage("org.treesitter.TreeSitterTypescript"),
+        tokenTypeMap = TYPESCRIPT_TOKEN_MAP,
+    )
+
+    /** Tree-sitter–powered Rust lexer. */
+    public fun rust(): TreeSitterLexer = TreeSitterLexer(
+        language = loadLanguage("org.treesitter.TreeSitterRust"),
+        tokenTypeMap = RUST_TOKEN_MAP,
+    )
+
+    /** Tree-sitter–powered Go lexer. */
+    public fun go(): TreeSitterLexer = TreeSitterLexer(
+        language = loadLanguage("org.treesitter.TreeSitterGo"),
+        tokenTypeMap = GO_TOKEN_MAP,
+    )
+
+    /** Tree-sitter–powered YAML lexer. */
+    public fun yaml(): TreeSitterLexer = TreeSitterLexer(
+        language = loadLanguage("org.treesitter.TreeSitterYaml"),
+        tokenTypeMap = YAML_TOKEN_MAP,
+    )
+
+    /** Tree-sitter–powered TOML lexer. */
+    public fun toml(): TreeSitterLexer = TreeSitterLexer(
+        language = loadLanguage("org.treesitter.TreeSitterToml"),
+        tokenTypeMap = TOML_TOKEN_MAP,
+    )
+
     /** Returns `null` if the grammar's native lib isn't on the classpath. */
     public fun byName(name: String): TreeSitterLexer? = try {
         when (name.lowercase()) {
@@ -61,6 +97,12 @@ public object TreeSitterLanguages {
             "json" -> json()
             "bash", "sh", "shell" -> bash()
             "markdown", "md" -> markdown()
+            "javascript", "js", "jsx" -> javascript()
+            "typescript", "ts", "tsx" -> typescript()
+            "rust", "rs" -> rust()
+            "go", "golang" -> go()
+            "yaml", "yml" -> yaml()
+            "toml" -> toml()
             else -> null
         }
     } catch (_: Throwable) {
@@ -322,4 +364,161 @@ public object TreeSitterLanguages {
         "thematic_break" to TokenType.OPERATOR,
     )
 
+    private val JS_KEYWORDS = listOf(
+        "async", "await", "break", "case", "catch", "class", "const", "continue", "debugger",
+        "default", "delete", "do", "else", "export", "extends", "finally", "for", "from",
+        "function", "get", "if", "import", "in", "instanceof", "let", "new", "of", "return",
+        "set", "static", "super", "switch", "this", "throw", "try", "typeof", "var", "void",
+        "while", "with", "yield",
+    )
+
+    private val JAVASCRIPT_TOKEN_MAP: Map<String, TokenType> = buildMap {
+        for (kw in JS_KEYWORDS) put(kw, TokenType.KEYWORD)
+        for (kw in listOf("true", "false", "null", "undefined")) put(kw, TokenType.KEYWORD_CONSTANT)
+        put("comment", TokenType.COMMENT)
+        put("number", TokenType.NUMBER)
+        put("string", TokenType.STRING)
+        put("string_fragment", TokenType.STRING)
+        put("template_string", TokenType.STRING)
+        put("escape_sequence", TokenType.STRING_ESCAPE)
+        put("template_substitution", TokenType.STRING_INTERPOLATION)
+        put("regex", TokenType.REGEX)
+        put("identifier", TokenType.IDENTIFIER)
+        put("property_identifier", TokenType.PROPERTY)
+        put("shorthand_property_identifier", TokenType.PROPERTY)
+        for (op in listOf("+", "-", "*", "/", "%", "=", "==", "===", "!=", "!==", "<", ">",
+            "<=", ">=", "&&", "||", "!", "=>", "?", "...", "++", "--")) put(op, TokenType.OPERATOR)
+        for (p in listOf("(", ")", "[", "]", "{", "}", ";", ",", ".", ":")) put(p, TokenType.PUNCTUATION)
+    }
+
+    private val TYPESCRIPT_TOKEN_MAP: Map<String, TokenType> = buildMap {
+        putAll(JAVASCRIPT_TOKEN_MAP)
+        // TS extends JS with type-related keywords.
+        for (kw in listOf("type", "interface", "enum", "namespace", "module", "declare",
+            "abstract", "implements", "readonly", "private", "protected", "public",
+            "as", "satisfies", "keyof", "infer")) put(kw, TokenType.KEYWORD)
+        for (kw in listOf("any", "boolean", "number", "string", "symbol", "object", "never", "unknown", "void"))
+            put(kw, TokenType.KEYWORD_TYPE)
+        put("type_identifier", TokenType.TYPE)
+        put("predefined_type", TokenType.KEYWORD_TYPE)
+    }
+
+    private val RUST_KEYWORDS = listOf(
+        "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum",
+        "extern", "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod",
+        "move", "mut", "pub", "ref", "return", "self", "Self", "static", "struct", "super",
+        "trait", "true", "type", "unsafe", "use", "where", "while", "yield", "union",
+    )
+
+    private val RUST_TOKEN_MAP: Map<String, TokenType> = buildMap {
+        for (kw in RUST_KEYWORDS) put(kw, TokenType.KEYWORD)
+        for (kw in listOf("i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32", "u64",
+            "u128", "usize", "f32", "f64", "bool", "char", "str", "String", "Vec", "Option",
+            "Result", "Box")) put(kw, TokenType.KEYWORD_TYPE)
+        for (kw in listOf("true", "false", "None", "Some", "Ok", "Err")) put(kw, TokenType.KEYWORD_CONSTANT)
+        put("line_comment", TokenType.COMMENT)
+        put("block_comment", TokenType.COMMENT)
+        put("integer_literal", TokenType.NUMBER)
+        put("float_literal", TokenType.NUMBER)
+        put("string_literal", TokenType.STRING)
+        put("raw_string_literal", TokenType.STRING)
+        put("char_literal", TokenType.STRING)
+        put("string_content", TokenType.STRING)
+        put("escape_sequence", TokenType.STRING_ESCAPE)
+        put("identifier", TokenType.IDENTIFIER)
+        put("type_identifier", TokenType.TYPE)
+        put("primitive_type", TokenType.KEYWORD_TYPE)
+        put("attribute_item", TokenType.ANNOTATION)
+        put("inner_attribute_item", TokenType.ANNOTATION)
+        for (op in listOf("+", "-", "*", "/", "%", "=", "==", "!=", "<", ">", "<=", ">=",
+            "&&", "||", "!", "&", "|", "^", "<<", ">>", "->", "=>", "?", "..", "..=", "::"))
+            put(op, TokenType.OPERATOR)
+        for (p in listOf("(", ")", "[", "]", "{", "}", ";", ",", ".", ":", "#")) put(p, TokenType.PUNCTUATION)
+    }
+
+    private val GO_KEYWORDS = listOf(
+        "break", "case", "chan", "const", "continue", "default", "defer", "else", "fallthrough",
+        "for", "func", "go", "goto", "if", "import", "interface", "map", "package", "range",
+        "return", "select", "struct", "switch", "type", "var",
+    )
+
+    private val GO_TOKEN_MAP: Map<String, TokenType> = buildMap {
+        for (kw in GO_KEYWORDS) put(kw, TokenType.KEYWORD)
+        for (kw in listOf("bool", "byte", "complex64", "complex128", "error", "float32", "float64",
+            "int", "int8", "int16", "int32", "int64", "rune", "string", "uint", "uint8", "uint16",
+            "uint32", "uint64", "uintptr", "any", "comparable")) put(kw, TokenType.KEYWORD_TYPE)
+        for (kw in listOf("true", "false", "nil", "iota")) put(kw, TokenType.KEYWORD_CONSTANT)
+        put("comment", TokenType.COMMENT)
+        put("int_literal", TokenType.NUMBER)
+        put("float_literal", TokenType.NUMBER)
+        put("imaginary_literal", TokenType.NUMBER)
+        put("rune_literal", TokenType.STRING)
+        put("interpreted_string_literal", TokenType.STRING)
+        put("raw_string_literal", TokenType.STRING)
+        put("escape_sequence", TokenType.STRING_ESCAPE)
+        put("identifier", TokenType.IDENTIFIER)
+        put("type_identifier", TokenType.TYPE)
+        put("package_identifier", TokenType.NAMESPACE)
+        put("field_identifier", TokenType.PROPERTY)
+        for (op in listOf("+", "-", "*", "/", "%", "=", ":=", "==", "!=", "<", ">", "<=", ">=",
+            "&&", "||", "!", "&", "|", "^", "<<", ">>", "->", "<-", "++", "--", "..."))
+            put(op, TokenType.OPERATOR)
+        for (p in listOf("(", ")", "[", "]", "{", "}", ";", ",", ".", ":")) put(p, TokenType.PUNCTUATION)
+    }
+
+    private val YAML_TOKEN_MAP: Map<String, TokenType> = mapOf(
+        "comment" to TokenType.COMMENT,
+        "string_scalar" to TokenType.STRING,
+        "double_quote_scalar" to TokenType.STRING,
+        "single_quote_scalar" to TokenType.STRING,
+        "block_scalar" to TokenType.STRING,
+        "plain_scalar" to TokenType.IDENTIFIER,
+        "integer_scalar" to TokenType.NUMBER,
+        "float_scalar" to TokenType.NUMBER,
+        "boolean_scalar" to TokenType.KEYWORD_CONSTANT,
+        "null_scalar" to TokenType.KEYWORD_CONSTANT,
+        "block_mapping_pair" to TokenType.YAML_KEY,
+        "flow_mapping" to TokenType.PUNCTUATION,
+        "block_sequence_item" to TokenType.OPERATOR,
+        "anchor_name" to TokenType.ANNOTATION,
+        "alias_name" to TokenType.ANNOTATION,
+        "tag" to TokenType.ANNOTATION,
+        "-" to TokenType.OPERATOR,
+        "?" to TokenType.OPERATOR,
+        ":" to TokenType.PUNCTUATION,
+        "," to TokenType.PUNCTUATION,
+        "[" to TokenType.PUNCTUATION,
+        "]" to TokenType.PUNCTUATION,
+        "{" to TokenType.PUNCTUATION,
+        "}" to TokenType.PUNCTUATION,
+    )
+
+    private val TOML_TOKEN_MAP: Map<String, TokenType> = mapOf(
+        "comment" to TokenType.COMMENT,
+        "string" to TokenType.STRING,
+        "basic_string" to TokenType.STRING,
+        "literal_string" to TokenType.STRING,
+        "multiline_basic_string" to TokenType.STRING,
+        "multiline_literal_string" to TokenType.STRING,
+        "escape_sequence" to TokenType.STRING_ESCAPE,
+        "integer" to TokenType.NUMBER,
+        "float" to TokenType.NUMBER,
+        "boolean" to TokenType.KEYWORD_CONSTANT,
+        "offset_date_time" to TokenType.NUMBER,
+        "local_date_time" to TokenType.NUMBER,
+        "local_date" to TokenType.NUMBER,
+        "local_time" to TokenType.NUMBER,
+        "bare_key" to TokenType.YAML_KEY,
+        "quoted_key" to TokenType.YAML_KEY,
+        "dotted_key" to TokenType.YAML_KEY,
+        "table" to TokenType.KEYWORD,
+        "array_table" to TokenType.KEYWORD,
+        "=" to TokenType.OPERATOR,
+        "[" to TokenType.PUNCTUATION,
+        "]" to TokenType.PUNCTUATION,
+        "{" to TokenType.PUNCTUATION,
+        "}" to TokenType.PUNCTUATION,
+        "," to TokenType.PUNCTUATION,
+        "." to TokenType.PUNCTUATION,
+    )
 }

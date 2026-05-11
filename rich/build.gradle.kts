@@ -42,6 +42,12 @@ dependencies {
     runtimeOnly(libs.treesitter.json)
     runtimeOnly(libs.treesitter.bash)
     runtimeOnly(libs.treesitter.markdown)
+    runtimeOnly(libs.treesitter.javascript)
+    runtimeOnly(libs.treesitter.typescript)
+    runtimeOnly(libs.treesitter.rust)
+    runtimeOnly(libs.treesitter.go)
+    runtimeOnly(libs.treesitter.yaml)
+    runtimeOnly(libs.treesitter.toml)
 
     testImplementation(libs.kotest.runner.junit5)
     testImplementation(libs.kotest.property)
@@ -53,6 +59,12 @@ dependencies {
     testImplementation(libs.treesitter.json)
     testImplementation(libs.treesitter.bash)
     testImplementation(libs.treesitter.markdown)
+    testImplementation(libs.treesitter.javascript)
+    testImplementation(libs.treesitter.typescript)
+    testImplementation(libs.treesitter.rust)
+    testImplementation(libs.treesitter.go)
+    testImplementation(libs.treesitter.yaml)
+    testImplementation(libs.treesitter.toml)
 }
 
 testing {
