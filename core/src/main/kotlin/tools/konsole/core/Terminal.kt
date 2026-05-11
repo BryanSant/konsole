@@ -189,9 +189,20 @@ public class Terminal internal constructor(
             // taking the whole terminal construction down. We don't need
             // JLine-managed signal handling; we wire WINCH ourselves in
             // EventReader. See JLine issue tracker for the upstream bug.
+            //
+            // graphemeCluster(false): TerminalBuilder.build() otherwise probes
+            // the terminal via CSI ?2027$p + DA1 + (fallback) CSI 6n cursor-
+            // position queries to decide whether to enable mode 2027 for
+            // emoji clustering. If the probe's drain window (default 25ms) is
+            // too short for the terminal's response, the leftover cursor
+            // report bytes get parsed/echoed during App run or leak to the
+            // shell at exit. konsole doesn't use JLine's grapheme cluster
+            // mode (rich's Cells does its own width calculation), so we skip
+            // the probe entirely.
             val jline = TerminalBuilder.builder()
                 .system(true)
                 .nativeSignals(false)
+                .graphemeCluster(false)
                 .build()
             return Terminal(jline)
         }
