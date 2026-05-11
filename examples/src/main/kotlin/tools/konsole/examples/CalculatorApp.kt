@@ -1,7 +1,9 @@
 package tools.konsole.examples
 
+import tools.konsole.rich.geometry.Region
 import tools.konsole.textual.app.App
 import tools.konsole.textual.binding.bindings
+import tools.konsole.textual.compositor.Compositor
 import tools.konsole.textual.driver.HeadlessDriver
 import tools.konsole.textual.driver.systemDriver
 import tools.konsole.textual.widget.Widget
@@ -68,13 +70,54 @@ public class CalculatorApp(headless: Boolean = false) : App(if (headless) Headle
     @Suppress("unused") public fun action_div() = operator('/')
     @Suppress("unused") public fun action_equals() = equals()
 
+    private val header = Header(title = "Calculator")
+    private val footer = Footer(this.bindings)
+
     override fun compose(): Sequence<Widget> = sequenceOf(
-        Header(title = "Calculator"),
+        header,
         display,
     ) + digits.asSequence() + sequenceOf(
         opPlus, opMinus, opMul, opDiv, opEquals, opClear,
-        Footer(this.bindings),
+        footer,
     )
+
+    override fun arrangeBaseLayer(widgets: List<Widget>) {
+        val w = screenWidth
+        val h = screenHeight
+        // Header on top row, footer on bottom row.
+        compositor.placeAt(header, Region(0, 0, w, 1), Compositor.BASE)
+        compositor.placeAt(footer, Region(0, h - 1, w, 1), Compositor.BASE)
+
+        // Big digit display under the header — 5 rows is the Digits font's natural height.
+        val displayHeight = 5
+        compositor.placeAt(display, Region(0, 1, w, displayHeight), Compositor.BASE)
+
+        // 4×4 grid below the display. 16 buttons in the order a standard
+        // calculator wants them; layout takes the remaining vertical space.
+        val gridTopY = 1 + displayHeight + 1   // one-row gap below display
+        val gridRows = 4
+        val gridCols = 4
+        val gridBottomY = h - 2                // one-row gap above footer
+        val gridHeight = (gridBottomY - gridTopY).coerceAtLeast(gridRows)
+        val cellH = (gridHeight / gridRows).coerceAtLeast(1)
+        val cellW = (w / gridCols).coerceAtLeast(1)
+
+        val layout: List<List<Button>> = listOf(
+            listOf(digits[7], digits[8], digits[9], opDiv),
+            listOf(digits[4], digits[5], digits[6], opMul),
+            listOf(digits[1], digits[2], digits[3], opMinus),
+            listOf(digits[0], opClear, opEquals, opPlus),
+        )
+        for ((r, row) in layout.withIndex()) {
+            for ((c, btn) in row.withIndex()) {
+                compositor.placeAt(
+                    btn,
+                    Region(c * cellW, gridTopY + r * cellH, cellW, cellH),
+                    Compositor.BASE,
+                )
+            }
+        }
+    }
 
     init {
         for (b in digits) {
