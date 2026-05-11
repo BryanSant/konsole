@@ -350,6 +350,9 @@ public abstract class App(
     public fun renderFrame() {
         ensureMounted()
         compositor.clear()
+        // Make the live stylesheet visible to the compositor so it can resolve
+        // CSS styles for Container children during recursive layout.
+        compositor.stylesheet = stylesheet
         val widgets = currentScreen?.compose()?.toList().orEmpty()
         arrangeBaseLayer(widgets)
         // Layered overlays: toasts pin to the bottom-right by default.

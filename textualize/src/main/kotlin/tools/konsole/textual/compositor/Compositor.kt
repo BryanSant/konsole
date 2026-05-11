@@ -70,6 +70,17 @@ public class Compositor(initialViewport: Region) {
     public val placements: List<Placement> get() = _placements.toList()
 
     /**
+     * Optional stylesheet consulted during recursive Container layout: each
+     * child's [tools.konsole.textual.css.Styles] is resolved by overlaying
+     * [tools.konsole.textual.css.Stylesheet.apply] on top of the container's
+     * own [tools.konsole.textual.widgets.Container.childStyles], so CSS wins
+     * over inline container defaults — matching textual semantics.
+     *
+     * The App typically sets this each frame from its [tools.konsole.textual.app.App.stylesheet].
+     */
+    public var stylesheet: tools.konsole.textual.css.Stylesheet? = null
+
+    /**
      * Place [widget] explicitly at [region] on [layer]. If [widget] is a
      * [tools.konsole.textual.widgets.Container], its children are recursively
      * arranged inside [region] using the matching
@@ -92,7 +103,12 @@ public class Compositor(initialViewport: Region) {
     ) {
         val children = container.containerChildren
         if (children.isEmpty()) return
-        val pairs = children.map { it to container.childStyles(it) }
+        val pairs = children.map { child ->
+            val containerStyles = container.childStyles(child)
+            val cssStyles = stylesheet?.apply(child) ?: tools.konsole.textual.css.Styles.NULL
+            // CSS overlays the container's own childStyles defaults — textual semantics.
+            child to (containerStyles + cssStyles)
+        }
         val layout = tools.konsole.textual.layouts.Layout.forKind(container.layout)
         val placements = if (container.layout == tools.konsole.textual.css.LayoutKind.Grid) {
             tools.konsole.textual.layouts.GridLayout
