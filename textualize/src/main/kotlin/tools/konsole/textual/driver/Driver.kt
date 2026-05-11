@@ -49,3 +49,21 @@ public interface Driver {
     /** Re-enable input after [disableInput]. */
     public fun enableInput()
 }
+
+/**
+ * Build a [TerminalDriver] bound to the process's controlling terminal via JLine FFM.
+ * Use this as the [tools.konsole.textual.app.App] driver when running interactively.
+ *
+ * ```
+ * class MyApp : App(systemDriver()) { … }
+ * ```
+ */
+public fun systemDriver(
+    enableKittyKeyboard: Boolean = true,
+    enableMouseMotion: Boolean = false,
+): Driver = TerminalDriver(
+    terminal = tools.konsole.core.Terminal.system(),
+    enableKittyKeyboard = enableKittyKeyboard,
+    enableMouseMotion = enableMouseMotion,
+)
+

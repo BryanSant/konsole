@@ -52,7 +52,7 @@ import tools.konsole.textual.worker.WorkerManager
  * ```
  *
  * Lifecycle (run()):
- *  1. Pick a [Driver] (LinuxDriver by default, [HeadlessDriver] if explicit).
+ *  1. Pick a [Driver] ([HeadlessDriver] by default for tests; pass [systemDriver] for real terminals).
  *  2. `driver.startApplicationMode()`.
  *  3. Mount the initial Screen (built from [compose]).
  *  4. Pump driver events into the root [MessagePump].

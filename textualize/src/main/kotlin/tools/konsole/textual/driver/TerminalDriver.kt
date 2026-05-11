@@ -26,8 +26,11 @@ import tools.konsole.textual.events.Paste
 import tools.konsole.textual.events.Resize
 
 /**
- * POSIX driver backed by [tools.konsole.core.Terminal] (JLine FFM). Mirrors Python
- * textual's `LinuxDriver`.
+ * Real-terminal driver backed by [tools.konsole.core.Terminal] (JLine FFM).
+ * Mirrors Python textual's `LinuxDriver` but the implementation is platform-
+ * agnostic: JLine's FFM provider abstracts raw mode, SIGWINCH (Console API on
+ * Windows), and the byte streams. Works on Linux, macOS, and Windows Terminal
+ * 1.25+ (which supports the kitty keyboard protocol). Web driver is v2.
  *
  * On [startApplicationMode]:
  *  1. enter raw mode
@@ -37,10 +40,8 @@ import tools.konsole.textual.events.Resize
  * Input events from [Terminal.events] are translated to textual-layer [TextualEvent]s
  * and re-emitted on a [SharedFlow]. Output [write] calls go through the terminal's
  * writer; concurrent writes are serialised by the terminal.
- *
- * Windows / Web drivers are deferred to v2.
  */
-public class LinuxDriver(
+public class TerminalDriver(
     public val terminal: Terminal,
     private val enableKittyKeyboard: Boolean = true,
     private val enableMouseMotion: Boolean = false,
