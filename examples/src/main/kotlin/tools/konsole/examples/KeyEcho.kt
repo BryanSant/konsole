@@ -2,6 +2,8 @@ package tools.konsole.examples
 
 import tools.konsole.core.InputMode
 import tools.konsole.core.Terminal
+import java.io.FileDescriptor
+import java.io.FileInputStream
 
 /**
  * Bypass the App layer entirely: enter raw mode + kitty/SGR-mouse/bracketed-
@@ -28,14 +30,20 @@ public fun main() {
         InputMode.EnableAll(kitty = true, mouseMotion = false).writeAnsi(sb)
         jline.writer().print(sb.toString())
         jline.writer().flush()
-        val reader = jline.reader()
+        // We deliberately bypass JLine's NonBlockingReader and read from
+        // FileDescriptor.in directly. The previous run showed JLine returning
+        // EOF immediately after the terminal's focus-in + resize responses;
+        // this probe rules in/out whether that's a JLine wrapper artefact
+        // vs. an actual EOF from the kernel.
+        val rawIn = FileInputStream(FileDescriptor.`in`)
         System.err.println("[KeyEcho] entered raw mode + kitty/SGR-mouse/paste/focus/resize.")
+        System.err.println("[KeyEcho] reading FROM FileDescriptor.in DIRECTLY (bypassing JLine).")
         System.err.println("[KeyEcho] press keys; type 'q' to quit (or send 0x03 Ctrl-C)…")
         val seenBytes = StringBuilder()
         while (true) {
-            val b = reader.read()
+            val b = rawIn.read()
             if (b < 0) {
-                System.err.println("[KeyEcho] reader returned EOF (-1); exiting")
+                System.err.println("[KeyEcho] FileDescriptor.in returned $b (true kernel EOF); exiting")
                 break
             }
             val ch = b.toChar()
