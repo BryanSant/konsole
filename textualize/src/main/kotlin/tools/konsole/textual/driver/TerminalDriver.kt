@@ -89,24 +89,13 @@ public class TerminalDriver(
         LeaveAlternateScreen.writeAnsi(sb)
         terminal.out.append(sb)
         terminal.out.flush()
-        // Briefly drain any pending input bytes before restoring cooked-mode
-        // termios. Terminals (and JLine itself, on close) may have queued up
-        // responses to mode queries — most commonly a CSI cursor-position
-        // report — that would otherwise leak to the shell prompt and either
-        // print as `^[[…R` or get echoed character-by-character because the
-        // shell receives them under ICANON+ECHO.
-        try {
-            val reader = terminal.underlying.reader()
-            val deadlineMs = System.currentTimeMillis() + 50L
-            while (System.currentTimeMillis() < deadlineMs) {
-                val timeLeft = deadlineMs - System.currentTimeMillis()
-                if (timeLeft <= 0) break
-                val b = reader.read(timeLeft)
-                if (b < 0) break  // EOF or timeout
-            }
-        } catch (_: Throwable) {
-            // best-effort drain; never block shutdown
-        }
+        // We don't drain pending input here on purpose. NonBlockingInputStream
+        // is synchronized, and the EventReader pump is parked inside a blocking
+        // read on the same instance; a drain on the main thread would deadlock
+        // behind the pump's lock until the user pressed a key. With
+        // graphemeCluster(false) on the builder we no longer emit query
+        // sequences whose late responses could leak to the shell, so the drain
+        // isn't needed.
         rawSaved?.let { terminal.underlying.attributes = it }
         started = false
     }
