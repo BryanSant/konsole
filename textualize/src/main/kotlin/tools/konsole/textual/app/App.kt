@@ -75,6 +75,14 @@ public abstract class App(
     /** Worker manager bound to this app's root scope. */
     public val workers: WorkerManager = WorkerManager(rootScope)
 
+    /**
+     * Animator bound to this app's root scope — use to tween widget
+     * properties (sizes, opacities, custom render values) over time.
+     * Animations are cancelled cleanly when the app exits.
+     */
+    public val animator: tools.konsole.textual.animator.Animator =
+        tools.konsole.textual.animator.Animator(rootScope)
+
     /** Bindings declared on the App (typically `q` → `quit`, etc). */
     public open val bindings: BindingsMap = BindingsMap()
 
