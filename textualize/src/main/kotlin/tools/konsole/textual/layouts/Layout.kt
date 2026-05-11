@@ -5,7 +5,6 @@ import tools.konsole.rich.geometry.Spacing
 import tools.konsole.textual.css.LayoutKind
 import tools.konsole.textual.css.Scalar
 import tools.konsole.textual.css.Styles
-import tools.konsole.textual.css.Unit
 import tools.konsole.textual.widget.Widget
 
 /** Result of laying out one widget — its assigned region. */

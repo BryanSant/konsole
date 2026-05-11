@@ -16,8 +16,8 @@ class LayoutTest : StringSpec({
         val placements = VerticalLayout.arrange(
             parent,
             listOf(
-                Box() to Styles(height = Scalar(5.0, Unit.Cells)),
-                Box() to Styles(height = Scalar(8.0, Unit.Cells)),
+                Box() to Styles(height = Scalar(5.0, LengthUnit.Cells)),
+                Box() to Styles(height = Scalar(8.0, LengthUnit.Cells)),
             ),
         )
         placements.size shouldBe 2
@@ -32,9 +32,9 @@ class LayoutTest : StringSpec({
         val placements = VerticalLayout.arrange(
             parent,
             listOf(
-                Box() to Styles(height = Scalar(10.0, Unit.Cells)),
-                Box() to Styles(height = Scalar(1.0, Unit.Fraction)),
-                Box() to Styles(height = Scalar(1.0, Unit.Fraction)),
+                Box() to Styles(height = Scalar(10.0, LengthUnit.Cells)),
+                Box() to Styles(height = Scalar(1.0, LengthUnit.Fraction)),
+                Box() to Styles(height = Scalar(1.0, LengthUnit.Fraction)),
             ),
         )
         // 30 - 10 = 20 remaining, 2 fractions ⇒ each 10
@@ -48,7 +48,7 @@ class LayoutTest : StringSpec({
             parent,
             listOf(
                 Box() to Styles(display = Display.None),
-                Box() to Styles(height = Scalar(3.0, Unit.Cells)),
+                Box() to Styles(height = Scalar(3.0, LengthUnit.Cells)),
             ),
         )
         placements.size shouldBe 1
@@ -60,8 +60,8 @@ class LayoutTest : StringSpec({
         val placements = HorizontalLayout.arrange(
             parent,
             listOf(
-                Box() to Styles(width = Scalar(10.0, Unit.Cells)),
-                Box() to Styles(width = Scalar(15.0, Unit.Cells)),
+                Box() to Styles(width = Scalar(10.0, LengthUnit.Cells)),
+                Box() to Styles(width = Scalar(15.0, LengthUnit.Cells)),
             ),
         )
         placements[0].region.x shouldBe 0

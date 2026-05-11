@@ -51,7 +51,7 @@ class StylesheetTest : StringSpec({
     "width parses to Scalar" {
         val sheet = Stylesheet.parse("Header { width: 50%; }")
         val s = sheet.apply(Header())
-        s.width?.unit shouldBe Unit.Percent
+        s.width?.unit shouldBe LengthUnit.Percent
         s.width?.value shouldBe 50.0
     }
 

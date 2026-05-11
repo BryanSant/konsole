@@ -168,7 +168,6 @@ public abstract class App(
                 stylesheet = tools.konsole.textual.css.Stylesheet.parse(content, file.name)
                 invalidate()
                 requestRefresh()
-                kotlin.Unit  // disambiguate from textual.css.Unit (Scalar enum) in scope
             },
         )
         watcher.start()

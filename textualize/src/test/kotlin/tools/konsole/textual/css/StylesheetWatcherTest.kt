@@ -25,7 +25,6 @@ class StylesheetWatcherTest : StringSpec({
                 onChange = { content ->
                     fired += 1
                     lastContent = content
-                    kotlin.Unit
                 },
                 debounceMs = 50L,
             )

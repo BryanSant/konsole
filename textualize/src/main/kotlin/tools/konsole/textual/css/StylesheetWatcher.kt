@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicLong
 public class StylesheetWatcher(
     public val file: File,
     private val scope: CoroutineScope,
-    private val onChange: suspend (newContent: String) -> kotlin.Unit,
+    private val onChange: suspend (newContent: String) -> Unit,
     private val debounceMs: Long = 100L,
 ) {
 
