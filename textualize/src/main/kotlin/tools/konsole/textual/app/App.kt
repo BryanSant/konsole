@@ -321,11 +321,24 @@ public abstract class App(
     /** Force the next [renderFrame] to repaint the entire screen (skip diffing). */
     public fun invalidate() { previousFrame = null }
 
+    /**
+     * Hook for subclasses to customise base-layer layout. Default behaviour
+     * is the compositor's row-per-widget vertical stack — fine for most apps,
+     * but demos with full-screen rendering or hand-rolled grids override this
+     * to call [Compositor.placeAt] explicitly.
+     *
+     * Invoked after [Compositor.clear] and before toast/overlay placement, so
+     * overrides should not clear the compositor themselves.
+     */
+    protected open fun arrangeBaseLayer(widgets: List<Widget>) {
+        if (widgets.isNotEmpty()) compositor.arrange(widgets, Compositor.BASE)
+    }
+
     public fun renderFrame() {
         ensureMounted()
         compositor.clear()
         val widgets = currentScreen?.compose()?.toList().orEmpty()
-        if (widgets.isNotEmpty()) compositor.arrange(widgets, Compositor.BASE)
+        arrangeBaseLayer(widgets)
         // Layered overlays: toasts pin to the bottom-right by default.
         synchronized(activeToasts) {
             var y = screenHeight - 4
