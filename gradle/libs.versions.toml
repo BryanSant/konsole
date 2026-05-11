@@ -1,0 +1,22 @@
+[versions]
+kotlin = "2.3.21"
+coroutines = "1.10.2"
+kotlinx-io = "0.9.0"
+jline = "4.1.0"
+kotest = "6.1.11"
+commonmark = "0.24.0"
+
+[libraries]
+kotlin-reflect          = { module = "org.jetbrains.kotlin:kotlin-reflect",            version.ref = "kotlin" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-io-core         = { module = "org.jetbrains.kotlinx:kotlinx-io-core",         version.ref = "kotlinx-io" }
+jline-terminal          = { module = "org.jline:jline-terminal",                      version.ref = "jline" }
+jline-terminal-ffm      = { module = "org.jline:jline-terminal-ffm",                  version.ref = "jline" }
+commonmark              = { module = "org.commonmark:commonmark",                     version.ref = "commonmark" }
+commonmark-gfm-tables   = { module = "org.commonmark:commonmark-ext-gfm-tables",      version.ref = "commonmark" }
+kotest-runner-junit5    = { module = "io.kotest:kotest-runner-junit5",                version.ref = "kotest" }
+kotest-property         = { module = "io.kotest:kotest-property",                     version.ref = "kotest" }
+kotest-assertions-core  = { module = "io.kotest:kotest-assertions-core",              version.ref = "kotest" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
