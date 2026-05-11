@@ -108,8 +108,11 @@ public open class Tree<T>(
     override fun render(): Renderable {
         val visible = visibleNodes()
         val cursorNode = visible.getOrNull(cursorLine)
-        // Build a rich Tree from the visible subtree. Highlight the cursor node.
-        fun build(n: Node<T>): RichTree {
+        // Build a rich Tree mirroring the visible subtree. We recurse by
+        // appending each child to its parent's RichTree via add() so nested
+        // expanded sub-trees actually render (the previous implementation
+        // discarded each child's subtree by only adding its `.label`).
+        fun labelFor(n: Node<T>): Text {
             val labelText = Text()
             val arrow = when {
                 n.children.isEmpty() -> "  "
@@ -117,20 +120,25 @@ public open class Tree<T>(
                 else -> "▶ "
             }
             val baseStyle = if (n === cursorNode) Style(color = Color.Black, bgcolor = Color.Cyan, bold = true)
-                            else if (hasFocus) Style.NULL else Style.NULL
+                            else Style.NULL
             if (n.children.isNotEmpty()) {
                 labelText.append(arrow, Style(color = Color.Cyan, bold = true))
             } else {
                 labelText.append(arrow, Style.NULL)
             }
             labelText.append(n.label, baseStyle)
-            val t = RichTree(labelText)
-            if (n.expanded) {
-                for (c in n.children) t.add(build(c).label)
-            }
-            return t
+            return labelText
         }
-        return build(root)
+        fun attachChildren(node: Node<T>, parent: RichTree) {
+            if (!node.expanded) return
+            for (c in node.children) {
+                val childTree = parent.add(labelFor(c))
+                attachChildren(c, childTree)
+            }
+        }
+        val rootTree = RichTree(labelFor(root))
+        attachChildren(root, rootTree)
+        return rootTree
     }
 
     /** A node in the [Tree]. */

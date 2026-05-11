@@ -160,6 +160,19 @@ class Phase96WidgetsTest : StringSpec({
         tmp.deleteRecursively()
     }
 
+    "Tree renders nested expanded sub-trees, not just the immediate children" {
+        // Regression: build() used to copy only `child.label` into the
+        // RichTree, so grandchildren of an expanded node never appeared in
+        // the rendered output.
+        val t = tools.konsole.textual.widgets.Tree<String>(rootLabel = "root", rootData = "root")
+        val sub = t.root.addLeaf("sub", "sub")
+        sub.addLeaf("nested", "nested")
+        sub.expanded = true
+        val out = render(t)
+        out shouldContain "sub"
+        out shouldContain "nested"
+    }
+
     "DirectoryTree lazy-populates a sub-directory on first expand" {
         // Sub-directories should only carry an `…` placeholder until the
         // user first expands them — that's what makes the arrow render
