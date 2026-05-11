@@ -51,6 +51,11 @@ public class Live(
     private val current: AtomicReference<Renderable> = AtomicReference(renderable)
     private val mutex = Any()
     private var renderedLines: Int = 0
+    // Snapshot of the last frame's rendered rows, used to (a) overwrite
+    // rows in place rather than wiping the whole region up-front (no
+    // flicker on terminals without BSU support) and (b) skip emitting
+    // rows whose content hasn't changed since the previous frame.
+    private var prevRows: List<tools.konsole.rich.layout.CollectedLine> = emptyList()
     private var refreshJob: Job? = null
     private var scope: CoroutineScope? = null
     private var started: Boolean = false
@@ -128,35 +133,70 @@ public class Live(
         }
     }
 
-    /** Render the current renderable, overwriting the previous frame. */
+    /**
+     * Render the current renderable, overwriting the previous frame in place.
+     *
+     * The naive pattern is "Clear(FromCursorDown) then re-emit every row" —
+     * but that leaves the region briefly empty between the clear and the
+     * writes, which terminals without BSU support render as a visible
+     * flash. Instead we move to the top of the prior region and overwrite
+     * each row, using Clear(UntilNewLine) to wipe just that row's tail. If
+     * the new frame has fewer rows than the previous one, the extra rows
+     * are erased the same way (write empty + clear-to-EOL). Rows whose
+     * segments are byte-for-byte identical to the previous frame's are
+     * skipped — the cursor just advances over them with `\n`, no rewrite.
+     */
     private fun drawFrame() {
         val renderable = current.get()
         val opts = console.defaultRenderOptions()
-        val lines = collectLines(renderable.render(console, opts)).let { lines ->
-            // Apply vertical-overflow if specified.
+        val newRows = collectLines(renderable.render(console, opts)).let { lines ->
             val cap = console.height
             if (cap > 0 && lines.size > cap && verticalOverflow != VerticalOverflow.Visible) {
                 lines.take(cap)
             } else lines
         }
 
-        // Move back to the top of the previously rendered region and clear from cursor down.
-        eraseRendered()
-
         val terminal = console.terminal
         val writer = console.writer
         val emit = {
-            for ((i, line) in lines.withIndex()) {
-                for (s in line.segments) writer.execute(tools.konsole.core.style.Print(s.text))
-                // After each line except the last, emit \n
-                if (i < lines.lastIndex) {
-                    writer.write("\n")
+            // Park at the top of the previous region (col 0, first row).
+            if (renderedLines > 0) {
+                writer.execute(MoveToColumn(0))
+                if (renderedLines > 1) writer.execute(MoveUp(renderedLines - 1))
+            }
+
+            val total = maxOf(newRows.size, prevRows.size)
+            for (i in 0 until total) {
+                val isLast = i == total - 1
+                val newRow = newRows.getOrNull(i)
+                val oldRow = prevRows.getOrNull(i)
+                val unchanged = newRow != null && oldRow == newRow
+
+                if (!unchanged) {
+                    // Overwrite this row: park at col 0, write segments,
+                    // wipe whatever was on the rest of the row.
+                    writer.execute(MoveToColumn(0))
+                    if (newRow != null) {
+                        for (s in newRow.segments) writer.execute(tools.konsole.core.style.Print(s.text))
+                    }
+                    writer.execute(Clear(ClearType.UntilNewLine))
                 }
+                if (!isLast) writer.write("\n")
+            }
+
+            // If the new frame shrank, walk the cursor back up to row
+            // (newRows.size - 1) so subsequent moves treat that as the
+            // bottom. The trailing rows have already been blanked.
+            if (newRows.size < prevRows.size) {
+                writer.execute(MoveToColumn(0))
+                val up = prevRows.size - newRows.size
+                if (up > 0) writer.execute(MoveUp(up))
             }
             writer.flush()
         }
         if (terminal != null) terminal.synchronizedUpdate(emit) else emit()
-        renderedLines = lines.size
+        renderedLines = newRows.size
+        prevRows = newRows
     }
 
     private fun eraseRendered() {
@@ -167,5 +207,6 @@ public class Live(
         if (renderedLines > 1) writer.execute(MoveUp(renderedLines - 1))
         writer.execute(Clear(ClearType.FromCursorDown))
         renderedLines = 0
+        prevRows = emptyList()
     }
 }
