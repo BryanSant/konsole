@@ -1,23 +1,23 @@
 package tools.konsole.examples
 
-import kotlinx.coroutines.runBlocking
 import tools.konsole.core.style.Color
-import tools.konsole.rich.Console
 import tools.konsole.rich.Style
 import tools.konsole.rich.Text
 import tools.konsole.rich.box.Box
 import tools.konsole.rich.panel.Panel
 import tools.konsole.textual.app.App
 import tools.konsole.textual.binding.bindings
+import tools.konsole.textual.css.LengthUnit
+import tools.konsole.textual.css.Scalar
 import tools.konsole.textual.driver.HeadlessDriver
-import tools.konsole.textual.pilot.Pilot
+import tools.konsole.textual.driver.systemDriver
 import tools.konsole.textual.widget.Widget
 import tools.konsole.textual.widgets.Footer
 import tools.konsole.textual.widgets.Header
 import tools.konsole.textual.widgets.Input
-import tools.konsole.textual.widgets.Label
 import tools.konsole.textual.widgets.OptionList
 import tools.konsole.textual.widgets.Static
+import tools.konsole.textual.widgets.Vertical
 import tools.konsole.textual.widgets.WordListSuggester
 
 private data class Entry(val word: String, val type: String, val definition: String)
@@ -35,13 +35,13 @@ private val SAMPLE_DICT: List<Entry> = listOf(
 
 /**
  * Live-search dictionary. Type into the [Input] and the matching entries
- * filter in real time; pick one with arrow + Enter to see the definition.
+ * filter in real time; arrow-key + Enter (or click) to see the definition.
  *
- *   ./gradlew :examples:runExample -Pexample=DictionaryApp
+ *   ./demo.sh Dictionary
  *
- * The bundled Pilot script searches for "comp" and selects "compositor".
+ * Keys: `/` focuses the search box, Esc clears it, q or Ctrl+C quits.
  */
-public class DictionaryApp : App(HeadlessDriver()) {
+public class DictionaryApp(headless: Boolean = false) : App(if (headless) HeadlessDriver() else systemDriver()) {
 
     private val search = Input(
         placeholder = "search…",
@@ -59,16 +59,34 @@ public class DictionaryApp : App(HeadlessDriver()) {
 
     override val bindings = bindings(
         "q" to "quit",
+        "ctrl+c" to "quit",
         "/" to "focus_search",
         "escape" to "clear_search",
     )
 
+    @Suppress("unused") public fun action_focus_search() { setFocus(search) }
+    @Suppress("unused") public fun action_clear_search() {
+        search.clear()
+        applyFilter("")
+    }
+
     override fun compose(): Sequence<Widget> = sequenceOf(
-        Header(title = "Dictionary"),
-        search,
-        list,
-        detail,
-        Footer(this.bindings),
+        Vertical(
+            children = listOf(
+                Header(title = "Dictionary"),
+                search,
+                list,
+                detail,
+                Footer(this.bindings),
+            ),
+            heights = listOf(
+                Scalar(1.0, LengthUnit.Cells),       // header
+                Scalar(1.0, LengthUnit.Cells),       // search input
+                Scalar(SAMPLE_DICT.size.toDouble(), LengthUnit.Cells),  // option list
+                Scalar(1.0, LengthUnit.Fraction),    // detail panel fills the rest
+                Scalar(1.0, LengthUnit.Cells),       // footer
+            ),
+        )
     )
 
     init {
@@ -78,6 +96,11 @@ public class DictionaryApp : App(HeadlessDriver()) {
         search.onMessage<Input.Changed> { applyFilter(it.value) }
         list.onMessage<OptionList.Highlighted> { showEntry(it.index) }
         list.onMessage<OptionList.Selected> { showEntry(it.index) }
+    }
+
+    override fun start() {
+        super.start()
+        if (focused !== search) setFocus(search)
     }
 
     private fun applyFilter(query: String) {
@@ -112,32 +135,6 @@ private fun defaultDetailPanel(e: Entry): Panel {
     )
 }
 
-public fun main(): Unit = runBlocking {
-    val app = DictionaryApp()
-    val pilot = Pilot(app)
-    pilot.use { p ->
-        p.pause(100)
-        app.renderFrame()
-
-        // Type "comp" into the search box
-        @Suppress("UNCHECKED_CAST")
-        val input = pilot.findOne("#search") as? Input ?: error("missing #search")
-        input.insert("comp")
-        p.pause(50)
-        app.renderFrame()
-
-        // Find "compositor" in the list and highlight it
-        @Suppress("UNCHECKED_CAST")
-        val list = pilot.findOne("#results") as? OptionList ?: error("missing #results")
-        // Walk to the "compositor" entry (index 5 in the original list)
-        val compIdx = SAMPLE_DICT.indexOfFirst { it.word == "compositor" }
-        if (compIdx >= 0) list.highlight(compIdx)
-        list.selectCurrent()
-        p.pause(50)
-        app.renderFrame()
-    }
-
-    val console = Console.system()
-    console.print("[bold]Dictionary demo finished.[/]")
-    console.print("Selected definition panel rendered to driver (${(app.driver as HeadlessDriver).output.length} bytes).")
+public fun main() {
+    DictionaryApp().run()
 }
