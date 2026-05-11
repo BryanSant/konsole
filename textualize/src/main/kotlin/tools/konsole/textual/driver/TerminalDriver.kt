@@ -89,6 +89,24 @@ public class TerminalDriver(
         LeaveAlternateScreen.writeAnsi(sb)
         terminal.out.append(sb)
         terminal.out.flush()
+        // Briefly drain any pending input bytes before restoring cooked-mode
+        // termios. Terminals (and JLine itself, on close) may have queued up
+        // responses to mode queries — most commonly a CSI cursor-position
+        // report — that would otherwise leak to the shell prompt and either
+        // print as `^[[…R` or get echoed character-by-character because the
+        // shell receives them under ICANON+ECHO.
+        try {
+            val reader = terminal.underlying.reader()
+            val deadlineMs = System.currentTimeMillis() + 50L
+            while (System.currentTimeMillis() < deadlineMs) {
+                val timeLeft = deadlineMs - System.currentTimeMillis()
+                if (timeLeft <= 0) break
+                val b = reader.read(timeLeft)
+                if (b < 0) break  // EOF or timeout
+            }
+        } catch (_: Throwable) {
+            // best-effort drain; never block shutdown
+        }
         rawSaved?.let { terminal.underlying.attributes = it }
         started = false
     }

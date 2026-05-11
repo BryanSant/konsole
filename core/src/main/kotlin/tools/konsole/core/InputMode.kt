@@ -88,9 +88,23 @@ public object InputMode {
         }
     }
 
-    /** Pop one entry from the kitty keyboard protocol flag stack (`CSI < u`). */
+    /**
+     * Disable the kitty keyboard protocol comprehensively. Some terminals
+     * (notably ghostty 1.x) don't reliably restore the default state from a
+     * lone pop, so we both:
+     *  - explicitly set the flag register to 0 via `CSI = 0 ; 1 u`
+     *    (clears every enhancement bit unconditionally), and
+     *  - pop one entry from the protocol's flag stack via `CSI < u`
+     *    (undoes [EnableKittyKeyboard]'s push for terminals that obey the
+     *    stack semantics).
+     *
+     * Terminals that don't understand one form ignore it.
+     */
     public data object DisableKittyKeyboard : Command {
-        override fun writeAnsi(out: Appendable) { out.append(CSI).append("<u") }
+        override fun writeAnsi(out: Appendable) {
+            out.append(CSI).append("=0;1u")
+            out.append(CSI).append("<u")
+        }
     }
 
     // ---- In-band window-size notifications (xterm mode 2048) ----
@@ -131,7 +145,13 @@ public object InputMode {
         }
     }
 
-    /** Pairs with [EnableAll] — emit on shutdown to restore the terminal cleanly. */
+    /**
+     * Pairs with [EnableAll] — emit on shutdown to restore the terminal
+     * cleanly. In addition to undoing every mode bit, this also resets a
+     * handful of defaults so the shell prompt isn't left with the App's
+     * cursor / SGR / scroll-region state: `CSI ?25h` (show cursor),
+     * `CSI 0m` (SGR reset), `CSI r` (reset scroll region).
+     */
     public data class DisableAll(
         val kitty: Boolean = true,
         val mouseMotion: Boolean = false,
@@ -143,6 +163,10 @@ public object InputMode {
             DisableSgrMouse.writeAnsi(out)
             DisableFocusEvents.writeAnsi(out)
             DisableBracketedPaste.writeAnsi(out)
+            // Safety resets for state the App may have changed but didn't track:
+            out.append(CSI).append("?25h")   // show cursor
+            out.append(CSI).append("0m")     // reset SGR (colors, bold, etc.)
+            out.append(CSI).append("r")      // reset scroll region
         }
     }
 }
