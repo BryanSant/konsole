@@ -529,7 +529,7 @@ public abstract class App(
                 dirty = true
             }
             is Key -> {
-                // Tab / Shift+Tab navigate focus before bindings run.
+                // Tab / Shift+Tab navigate focus before anything else runs.
                 if (event.code == KeyCode.Tab && event.modifiers.bits == 0) {
                     focusNext()
                     dirty = true
@@ -540,25 +540,41 @@ public abstract class App(
                     dirty = true
                     return
                 }
-                // Bindings: focused → screen → app, action_<name> dispatch first.
-                val match = focused?.bindings?.match(event)
-                    ?: currentScreen?.bindings?.match(event)
-                    ?: bindings.match(event)
+
+                val focusedTarget = focused
+
+                // 1. The focused widget's own bindings get the first shot.
+                //    Arrow keys, Enter, backspace etc. on Input / TextArea
+                //    dispatch here. These take priority over screen / app
+                //    bindings so widget-local navigation always wins.
+                val focusedMatch = focusedTarget?.bindings?.match(event)
+                if (focusedMatch != null) {
+                    if (!action(focusedMatch.action) && focusedMatch.action == "quit") exit()
+                    dirty = true
+                    return
+                }
+
+                // 2. Forward to the focused widget's onEvent so text inputs
+                //    can consume printable keystrokes. The widget calls
+                //    `event.stop()` when it accepts the key; if it doesn't
+                //    consume, fall through to screen / app bindings so
+                //    unhandled keys still trigger global shortcuts.
+                if (focusedTarget != null) {
+                    focusedTarget.onEvent(event)
+                    if (event.isStopped) {
+                        dirty = true
+                        return
+                    }
+                }
+
+                // 3. Screen and App bindings handle anything the focused
+                //    widget didn't consume — quit shortcuts, navigation
+                //    accelerators, etc.
+                val match = currentScreen?.bindings?.match(event) ?: bindings.match(event)
                 if (match != null) {
-                    if (!action(match.action)) {
-                        // Built-in fallback for "quit".
-                        if (match.action == "quit") exit()
-                    }
-                } else {
-                    // Forward to focused widget first, synchronously, so order
-                    // is preserved against binding-action dispatch. If the
-                    // widget consumes the event (event.stop()), we stop.
-                    val target = focused
-                    if (target != null) {
-                        target.onEvent(event)
-                    } else {
-                        currentScreen?.post(event)
-                    }
+                    if (!action(match.action) && match.action == "quit") exit()
+                } else if (focusedTarget == null) {
+                    currentScreen?.post(event)
                 }
                 dirty = true
             }

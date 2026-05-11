@@ -250,7 +250,10 @@ public open class TextArea(
     override suspend fun onEvent(event: tools.konsole.textual.events.Event) {
         if (readOnly) return
         if (event !is tools.konsole.textual.events.Key) return
-        if (event.modifiers.bits != 0) return
+        // Shift alone is fine (capital letters / shifted symbols). Reject
+        // other modifiers so Ctrl/Alt shortcuts can still bubble up.
+        val mods = event.modifiers
+        if (mods.hasControl() || mods.hasAlt() || mods.hasSuper() || mods.hasHyper() || mods.hasMeta()) return
         val code = event.code
         if (code is tools.konsole.core.event.KeyCode.Char) {
             val ch = code.c
