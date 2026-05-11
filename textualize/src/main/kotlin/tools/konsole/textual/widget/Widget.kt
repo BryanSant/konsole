@@ -41,6 +41,15 @@ public abstract class Widget(
     public open val bindings: BindingsMap = BindingsMap()
 
     /**
+     * Hint to the compositor about which overlay layer this widget belongs on
+     * when added to a [tools.konsole.textual.compositor.Compositor]. `null`
+     * means "use the caller-supplied layer or the default `BASE`". Widgets
+     * that are inherently floating (Toast/Tooltip/popups) override this to
+     * pin themselves to the right layer regardless of where they're placed.
+     */
+    public open val preferredLayer: tools.konsole.textual.compositor.Compositor.Layer? get() = null
+
+    /**
      * Compose child widgets. Default: no children.
      * Override and yield via the [Sequence] builder:
      *

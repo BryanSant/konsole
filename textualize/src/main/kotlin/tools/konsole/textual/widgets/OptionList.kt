@@ -144,11 +144,42 @@ public open class Select<T>(
         )
     )
 
+    /** Whether the dropdown overlay is currently open. */
+    public var isOpen: Boolean = false
+        private set
+
     /** Programmatically pick an option. */
     public fun setSelected(value: T?) {
         if (value == selected) return
         selected = value
         post(Changed(this, value))
+        refresh()
+    }
+
+    /**
+     * Open the dropdown overlay on [compositor] anchored below this widget's [anchor] region.
+     *
+     * The dropdown is an [OptionList] preloaded with this Select's option labels.
+     * Apps wire the [OptionList.Selected] callback to call [setSelected] and [close]
+     * the dropdown — see `Pilot`-driven tests for the full round-trip.
+     */
+    public fun open(
+        compositor: tools.konsole.textual.compositor.Compositor,
+        anchor: tools.konsole.rich.geometry.Region,
+        layer: tools.konsole.textual.compositor.Compositor.Layer = tools.konsole.textual.compositor.Compositor.OVERLAY,
+    ): OptionList {
+        val labels = options.map { it.second }
+        val list = OptionList.ofLabels(labels)
+        compositor.placeBelow(list, anchor, width = anchor.width.coerceAtLeast(20), height = (labels.size + 2).coerceAtMost(8), layer = layer)
+        isOpen = true
+        refresh()
+        return list
+    }
+
+    /** Close the dropdown overlay. The caller is responsible for removing it from the compositor. */
+    public fun close() {
+        if (!isOpen) return
+        isOpen = false
         refresh()
     }
 

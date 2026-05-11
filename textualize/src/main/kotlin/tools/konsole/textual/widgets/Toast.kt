@@ -35,6 +35,9 @@ public open class Toast(
     classes: Set<String> = emptySet(),
 ) : Widget(id, classes) {
 
+    override val preferredLayer: tools.konsole.textual.compositor.Compositor.Layer
+        get() = tools.konsole.textual.compositor.Compositor.TOAST
+
     public var dismissed: Boolean = false
         private set
 
@@ -88,6 +91,9 @@ public open class Tooltip(
     id: String? = null,
     classes: Set<String> = emptySet(),
 ) : Widget(id, classes) {
+
+    override val preferredLayer: tools.konsole.textual.compositor.Compositor.Layer
+        get() = tools.konsole.textual.compositor.Compositor.TOOLTIP
 
     override fun render(): Renderable {
         val body = Markup.parse(text)
