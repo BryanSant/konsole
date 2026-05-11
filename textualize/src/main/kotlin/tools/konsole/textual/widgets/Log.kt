@@ -55,9 +55,15 @@ public open class Log(
 
     public val size: Int get() = lines.size
 
-    override fun renderLine(y: Int, width: Int): tools.konsole.rich.Strip {
-        val line = lines.getOrNull(y) ?: return tools.konsole.rich.Strip.EMPTY
-        return tools.konsole.rich.Strip.of(tools.konsole.rich.Segment(line)).adjustCellLength(width)
+    override fun renderStrips(width: Int, startY: Int, count: Int): List<tools.konsole.rich.Strip> {
+        if (count <= 0) return emptyList()
+        val result = ArrayList<tools.konsole.rich.Strip>(count)
+        for (i in 0 until count) {
+            val line = lines.getOrNull(startY + i)
+            result += if (line != null) tools.konsole.rich.Strip.of(tools.konsole.rich.Segment(line)).adjustCellLength(width)
+                      else tools.konsole.rich.Strip.EMPTY
+        }
+        return result
     }
 
     override val canFocus: Boolean get() = true

@@ -79,9 +79,10 @@ public abstract class ModalScreen<T>(
      * Render the backdrop. Subclasses' content (returned from [compose])
      * is rendered by the compositor over this base.
      */
-    override fun renderLine(y: Int, width: Int): Strip {
-        if (!showBackdrop) return Strip.EMPTY
-        return Strip.of(Segment(" ".repeat(width), backdropStyle))
+    override fun renderStrips(width: Int, startY: Int, count: Int): List<Strip> {
+        if (count <= 0) return emptyList()
+        val row: Strip = if (showBackdrop) Strip.of(Segment(" ".repeat(width), backdropStyle)) else Strip.EMPTY
+        return List(count) { row }
     }
 
     override fun render(): Renderable = Text("")  // children render themselves

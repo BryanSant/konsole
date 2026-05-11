@@ -87,20 +87,20 @@ public open class Slider(
 
     override fun render(): Renderable = Text("")  // we draw the line ourselves
 
-    override fun renderLine(y: Int, width: Int): Strip {
-        if (y != 0) return Strip.EMPTY
-        if (width <= 0) return Strip.EMPTY
-        val handleCol = ((width - 1) * ratio).toInt().coerceIn(0, width - 1)
-        val filledStyle = Style(color = if (hasFocus) Color.Cyan else Color.Blue, bold = true)
-        val emptyStyle = Style(color = Color.DarkGrey)
-        val handleStyle = Style(color = if (hasFocus) Color.Yellow else Color.White, bold = true)
-
-        val sb = StringBuilder()
-        val segments = mutableListOf<Segment>()
-        if (handleCol > 0) segments += Segment("━".repeat(handleCol), filledStyle)
-        segments += Segment("●", handleStyle)
-        if (handleCol < width - 1) segments += Segment("━".repeat(width - 1 - handleCol), emptyStyle)
-        return Strip.of(segments)
+    override fun renderStrips(width: Int, startY: Int, count: Int): List<Strip> {
+        if (count <= 0) return emptyList()
+        val bar: Strip = if (width <= 0) Strip.EMPTY else {
+            val handleCol = ((width - 1) * ratio).toInt().coerceIn(0, width - 1)
+            val filledStyle = Style(color = if (hasFocus) Color.Cyan else Color.Blue, bold = true)
+            val emptyStyle = Style(color = Color.DarkGrey)
+            val handleStyle = Style(color = if (hasFocus) Color.Yellow else Color.White, bold = true)
+            val segments = mutableListOf<Segment>()
+            if (handleCol > 0) segments += Segment("━".repeat(handleCol), filledStyle)
+            segments += Segment("●", handleStyle)
+            if (handleCol < width - 1) segments += Segment("━".repeat(width - 1 - handleCol), emptyStyle)
+            Strip.of(segments)
+        }
+        return List(count) { i -> if (startY + i == 0) bar else Strip.EMPTY }
     }
 
     /** Posted when [value] changes. */

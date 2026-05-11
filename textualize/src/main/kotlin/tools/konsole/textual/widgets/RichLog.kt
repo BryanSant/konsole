@@ -60,14 +60,20 @@ public open class RichLog(
     /** Number of currently-buffered lines. */
     public val size: Int get() = lines.size
 
-    override fun renderLine(y: Int, width: Int): tools.konsole.rich.Strip {
-        val line = lines.getOrNull(y) ?: return tools.konsole.rich.Strip.EMPTY
-        val segments = mutableListOf<tools.konsole.rich.Segment>()
-        for (seg in line.render(tools.konsole.rich.Console.string(width = width), tools.konsole.rich.RenderOptions(maxWidth = width))) {
-            if (seg.text == "\n") continue  // single-line entries only
-            segments += seg
+    override fun renderStrips(width: Int, startY: Int, count: Int): List<tools.konsole.rich.Strip> {
+        if (count <= 0) return emptyList()
+        val result = ArrayList<tools.konsole.rich.Strip>(count)
+        for (i in 0 until count) {
+            val line = lines.getOrNull(startY + i)
+            if (line == null) { result += tools.konsole.rich.Strip.EMPTY; continue }
+            val segments = mutableListOf<tools.konsole.rich.Segment>()
+            for (seg in line.render(tools.konsole.rich.Console.string(width = width), tools.konsole.rich.RenderOptions(maxWidth = width))) {
+                if (seg.text == "\n") continue  // single-line entries only
+                segments += seg
+            }
+            result += tools.konsole.rich.Strip.of(segments).adjustCellLength(width)
         }
-        return tools.konsole.rich.Strip.of(segments).adjustCellLength(width)
+        return result
     }
 
     override val canFocus: Boolean get() = true

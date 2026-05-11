@@ -285,15 +285,18 @@ public class Compositor(initialViewport: Region) {
         val scrollable = p.widget as? tools.konsole.textual.widget.Scrollable
         val scrollY = scrollable?.scrollY ?: 0
         val scrollX = scrollable?.scrollX ?: 0
-        // Render the line at the scrolled-into-content position. For
-        // horizontal scrolling we ask the widget for a wider strip
+        // Render the visible content rows in one call so widgets using the
+        // default renderStrips don't pay an O(N²) "full render per row" cost.
+        // For horizontal scrolling we ask the widget for a wider strip
         // (widgetWidth + scrollX) and then drop the leading scrollX cells.
         val requestedWidth = if (scrollX > 0) widgetWidth + scrollX else widgetWidth
+        val strips = try {
+            p.widget.renderStrips(requestedWidth, scrollY, p.region.height)
+        } catch (_: Throwable) { emptyList() }
         for (localY in 0 until p.region.height) {
             val absY = p.region.y + localY - viewport.y
             if (absY !in rows.indices) continue
-            val contentY = localY + scrollY
-            val strip = try { p.widget.renderLine(contentY, requestedWidth) } catch (_: Throwable) { Strip.EMPTY }
+            val strip = strips.getOrNull(localY) ?: Strip.EMPTY
             val sized = strip.adjustCellLength(requestedWidth)
             var col = 0
             for (seg in sized) {

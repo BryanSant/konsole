@@ -110,26 +110,43 @@ public abstract class Widget(
     public open fun render(): Renderable = tools.konsole.rich.Text("")
 
     /**
-     * Render a single line at [y] (0 is the top of the widget's region) as a [Strip].
-     * Default implementation calls [render] and slices its [Segment] stream into lines.
+     * Render this widget's content as a list of [Strip]s for the row range
+     * `[startY, startY + count)`. The compositor calls this once per
+     * placement; for [tools.konsole.textual.widget.Scrollable] widgets
+     * [startY] reflects the current scroll offset.
+     *
+     * The default implementation renders [render] once and splits its
+     * [Segment] stream by newline, fixing the O(N²) cost of calling the
+     * legacy per-line [renderLine] N times for widgets that only produce
+     * a single [Renderable]. Override when content is indexable per-row
+     * (logs, tables) so rows outside the visible window aren't built.
      */
-    public open fun renderLine(y: Int, width: Int): Strip {
-        // Lazy/uncached default — a real implementation in Phase 9 will memoize the rendered lines.
-        val segments = mutableListOf<Segment>()
+    public open fun renderStrips(width: Int, startY: Int, count: Int): List<Strip> {
+        if (count <= 0) return emptyList()
         val flat = render().render(
             console = tools.konsole.rich.Console.string(width = width),
             options = tools.konsole.rich.RenderOptions(maxWidth = width),
         )
-        for (seg in flat) segments += seg
-        // Split by newline segments
-        val lines: MutableList<MutableList<Segment>> = mutableListOf(mutableListOf<Segment>())
-        for (seg in segments) {
+        val lines: MutableList<MutableList<Segment>> = mutableListOf(mutableListOf())
+        for (seg in flat) {
             if (seg.text == "\n") lines.add(mutableListOf())
             else lines.last().add(seg)
         }
-        val line = lines.getOrNull(y) ?: return Strip.EMPTY
-        return Strip.of(line).adjustCellLength(width)
+        val result = ArrayList<Strip>(count)
+        for (i in 0 until count) {
+            val row = lines.getOrNull(startY + i)
+            result += if (row != null) Strip.of(row).adjustCellLength(width) else Strip.EMPTY
+        }
+        return result
     }
+
+    /**
+     * Render a single line at [y] (0 is the top of the widget's region) as a [Strip].
+     * Convenience that delegates to [renderStrips]; the compositor uses
+     * [renderStrips] directly so the full-content render is paid once per frame.
+     */
+    public open fun renderLine(y: Int, width: Int): Strip =
+        renderStrips(width, y, 1).firstOrNull() ?: Strip.EMPTY
 
     /** Request a re-render. Default no-op; Phase 8 hooks this into the compositor's dirty list. */
     public open fun refresh() { /* Phase 8 */ }
