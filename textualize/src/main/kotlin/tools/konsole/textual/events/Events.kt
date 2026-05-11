@@ -38,13 +38,42 @@ public data class Key(
     }
 }
 
-/** A pointer/mouse click. */
+/**
+ * Mouse button pressed at `(x, y)`. Mirrors Python textual's `MouseDown`.
+ * Apps that need to detect drag start subscribe to this; the higher-level
+ * [Click] event still fires when the user releases over the same target.
+ */
+public data class MouseDown(val x: Int, val y: Int, val button: MouseButton = MouseButton.Left) : Event()
+
+/** Mouse button released at `(x, y)`. Mirrors Python textual's `MouseUp`. */
+public data class MouseUp(val x: Int, val y: Int, val button: MouseButton = MouseButton.Left) : Event()
+
+/**
+ * Composite "click" — fires after [MouseDown] then [MouseUp] over the same
+ * widget. Most apps subscribe to this and ignore the lower-level Down/Up
+ * pair. Equivalent to a `mouseup` on the originally-pressed target in DOM
+ * semantics.
+ */
 public data class Click(val x: Int, val y: Int, val button: MouseButton = MouseButton.Left) : Event()
 
 public enum class MouseButton { Left, Middle, Right, WheelUp, WheelDown }
 
 /** A pointer move. */
 public data class MouseMove(val x: Int, val y: Int) : Event()
+
+/**
+ * Pointer dragged while a button is held — fires on every [MouseMove] that
+ * happens between [MouseDown] and [MouseUp]. Carries the button that was
+ * held and the cell coordinates of the pointer at the moment of the move.
+ * Mirrors textual's `MouseScrollDown`/`MouseScrollUp`-adjacent semantics.
+ */
+public data class MouseDrag(
+    val x: Int,
+    val y: Int,
+    val button: MouseButton,
+    val startX: Int,
+    val startY: Int,
+) : Event()
 
 /** Terminal resized. Carries the new size in cells. */
 public data class Resize(val columns: Int, val rows: Int) : Event()

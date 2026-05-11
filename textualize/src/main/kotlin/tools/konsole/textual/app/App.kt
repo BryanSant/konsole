@@ -25,7 +25,10 @@ import tools.konsole.textual.events.Event
 import tools.konsole.textual.events.Focus
 import tools.konsole.textual.events.Key
 import tools.konsole.textual.events.Mount
+import tools.konsole.textual.events.MouseDown
+import tools.konsole.textual.events.MouseDrag
 import tools.konsole.textual.events.MouseMove
+import tools.konsole.textual.events.MouseUp
 import tools.konsole.textual.events.Resize
 import tools.konsole.textual.events.Unmount
 import tools.konsole.textual.dom.DOMNode
@@ -160,12 +163,21 @@ public abstract class App(
      * starts driver-event pumping and mounts the default screen. Test harnesses
      * (Pilot) call this directly without going through [run].
      */
+    /** Auto-focus the first focusable widget when the app first mounts. Override to disable. */
+    public open val autoFocusOnStart: Boolean get() = true
+
     override fun start() {
         super.start()
         ensureMounted()
         if (!driverPumpStarted) {
             pumpDriverEvents()
             driverPumpStarted = true
+        }
+        if (autoFocusOnStart && focused == null) {
+            val firstFocusable = currentScreen?.walk()
+                ?.filterIsInstance<Widget>()
+                ?.firstOrNull { it.canFocus }
+            if (firstFocusable != null) setFocus(firstFocusable)
         }
     }
 
@@ -239,6 +251,11 @@ public abstract class App(
 
     /** Last widget the pointer was over — used to clear the previous hover when the pointer moves. */
     private var hoveredWidget: Widget? = null
+
+    /** Widget that received the most recent MouseDown — Click fires on MouseUp over the same widget. */
+    private var pressedWidget: Widget? = null
+    private var pressedX: Int = 0
+    private var pressedY: Int = 0
 
     private fun updateHover(target: Widget?) {
         if (hoveredWidget === target) return
@@ -331,32 +348,51 @@ public abstract class App(
                 post(event)
                 currentScreen?.post(event)
             }
-            is Click, is MouseMove -> {
-                val (x, y) = when (event) {
-                    is Click -> event.x to event.y
-                    is MouseMove -> event.x to event.y
-                    else -> 0 to 0
+            is MouseDown -> {
+                val target = compositor.hitTest(event.x, event.y)
+                updateHover(target)
+                pressedWidget = target
+                pressedX = event.x; pressedY = event.y
+                target?.isPressed = true
+                target?.post(event) ?: currentScreen?.post(event)
+                dirty = true
+            }
+            is MouseUp -> {
+                val target = compositor.hitTest(event.x, event.y)
+                val pressed = pressedWidget
+                pressed?.isPressed = false
+                // If MouseUp landed on the same widget as MouseDown, synthesise a Click.
+                if (pressed != null && pressed === target) {
+                    pressed.post(Click(event.x, event.y, event.button))
                 }
-                // Find the topmost widget at the pointer; deliver directly.
-                val target = compositor.hitTest(x, y)
-                when (event) {
-                    is MouseMove -> updateHover(target)
-                    is Click -> {
-                        updateHover(target)
-                        // Click: briefly mark target as pressed so widgets can show a press visual.
-                        target?.let {
-                            it.isPressed = true
-                            rootScope.launch {
-                                delay(80)
-                                it.isPressed = false
-                                requestRefresh()
-                            }
-                        }
+                target?.post(event) ?: currentScreen?.post(event)
+                pressedWidget = null
+                dirty = true
+            }
+            is Click -> {
+                // Direct Click event (e.g. injected by Pilot or single-event drivers).
+                val target = compositor.hitTest(event.x, event.y)
+                updateHover(target)
+                target?.let {
+                    it.isPressed = true
+                    rootScope.launch {
+                        delay(80)
+                        it.isPressed = false
+                        requestRefresh()
                     }
-                    else -> {}
+                    it.post(event)
+                } ?: currentScreen?.post(event)
+                dirty = true
+            }
+            is MouseMove -> {
+                val target = compositor.hitTest(event.x, event.y)
+                updateHover(target)
+                // If a button is held, also fire MouseDrag.
+                val pressed = pressedWidget
+                if (pressed != null) {
+                    pressed.post(MouseDrag(event.x, event.y, tools.konsole.textual.events.MouseButton.Left, pressedX, pressedY))
                 }
-                if (target != null) target.post(event)
-                else currentScreen?.post(event)
+                target?.post(event) ?: currentScreen?.post(event)
                 dirty = true
             }
             is Key -> {

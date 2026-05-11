@@ -52,8 +52,7 @@ class Phase912Test : StringSpec({
     "focusNext cycles through focusable widgets in order" {
         val app = MultiFocusApp()
         app.start()
-        app.focused shouldBe null
-        app.focusNext()
+        // App auto-focuses the first focusable on start.
         app.focused shouldBe app.a
         app.focusNext()
         app.focused shouldBe app.b
