@@ -14,6 +14,7 @@ import tools.konsole.core.InputMode
 import tools.konsole.core.Terminal
 import tools.konsole.core.event.Event as CoreEvent
 import tools.konsole.core.event.KeyEvent
+import tools.konsole.core.Hide as HideCursor
 import tools.konsole.core.terminal.EnterAlternateScreen
 import tools.konsole.core.terminal.LeaveAlternateScreen
 import tools.konsole.textual.events.AppBlur
@@ -64,6 +65,7 @@ public class TerminalDriver(
         Terminal.fixupBlockingRawMode(terminal.underlying)
         val sb0 = StringBuilder()
         EnterAlternateScreen.writeAnsi(sb0)
+        HideCursor.writeAnsi(sb0)   // hide cursor for the duration of the App
         terminal.out.append(sb0)
         val mode = InputMode.EnableAll(kitty = enableKittyKeyboard, mouseMotion = enableMouseMotion)
         val sb = StringBuilder()
