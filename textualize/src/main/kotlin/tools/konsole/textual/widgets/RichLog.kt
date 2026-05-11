@@ -1,0 +1,75 @@
+package tools.konsole.textual.widgets
+
+import tools.konsole.rich.Renderable
+import tools.konsole.rich.Text
+import tools.konsole.rich.markup.Markup
+import tools.konsole.textual.widget.Scrollable
+import tools.konsole.textual.widget.Widget
+
+/**
+ * Scrolling log buffer — append lines or renderables, see them stacked.
+ * Mirrors Python textual's `RichLog` widget.
+ *
+ * Older lines drop off when [maxLines] is exceeded. `auto_scroll` (always-on
+ * for now — Phase 9.5 will expose it) keeps the bottom of the buffer visible.
+ *
+ * @param maxLines bounded buffer size; older lines are dropped FIFO.
+ *   `null` for unbounded.
+ * @param highlight enable rich's default repr highlighter on plain string writes.
+ *   Mirrors textual's `highlight` flag.
+ * @param markup parse markup in string writes.
+ */
+public open class RichLog(
+    public val maxLines: Int? = 1000,
+    public val highlight: Boolean = false,
+    public val markup: Boolean = true,
+    id: String? = null,
+    classes: Set<String> = emptySet(),
+) : Widget(id, classes), Scrollable {
+
+    private val lines: ArrayDeque<Renderable> = ArrayDeque()
+
+    override var scrollX: Int = 0
+    override var scrollY: Int = 0
+    override val contentWidth: Int get() = 0  // computed at render time
+    override val contentHeight: Int get() = lines.size
+
+    /** Append a string (markup-parsed if [markup]). */
+    public open fun write(text: String) {
+        val rendered = if (markup) Markup.parse(text) else Text(text)
+        write(rendered)
+    }
+
+    /** Append an arbitrary [Renderable]. */
+    public open fun write(renderable: Renderable) {
+        lines.addLast(renderable)
+        if (maxLines != null && lines.size > maxLines) lines.removeFirst()
+        // Auto-scroll to bottom
+        scrollY = (lines.size - 1).coerceAtLeast(0)
+        refresh()
+    }
+
+    /** Drop every buffered line. */
+    public open fun clear() {
+        if (lines.isEmpty()) return
+        lines.clear()
+        scrollY = 0
+        refresh()
+    }
+
+    /** Number of currently-buffered lines. */
+    public val size: Int get() = lines.size
+
+    override fun render(): Renderable {
+        // Concatenate all lines with newlines between them; the compositor handles
+        // viewport clipping once the full scroll-view pipeline lands (Phase 9.6).
+        val combined = Text()
+        for ((i, line) in lines.withIndex()) {
+            for (seg in line.render(tools.konsole.rich.Console.string(width = 120), tools.konsole.rich.RenderOptions(maxWidth = 120))) {
+                combined.append(seg.text, seg.style)
+            }
+            if (i < lines.size - 1) combined.append("\n")
+        }
+        return combined
+    }
+}
