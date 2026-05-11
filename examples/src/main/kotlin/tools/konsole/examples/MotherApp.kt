@@ -6,16 +6,17 @@ import tools.konsole.rich.Segment
 import tools.konsole.rich.Strip
 import tools.konsole.rich.Style
 import tools.konsole.rich.Text
-import tools.konsole.rich.geometry.Region
 import tools.konsole.textual.app.App
 import tools.konsole.textual.binding.bindings
-import tools.konsole.textual.compositor.Compositor
+import tools.konsole.textual.css.LengthUnit
+import tools.konsole.textual.css.Scalar
 import tools.konsole.textual.driver.HeadlessDriver
 import tools.konsole.textual.driver.systemDriver
 import tools.konsole.textual.widget.Widget
 import tools.konsole.textual.widgets.Footer
 import tools.konsole.textual.widgets.Header
 import tools.konsole.textual.widgets.Input
+import tools.konsole.textual.widgets.Vertical
 
 /**
  * Chat UI inspired by textual's `examples/mother.py`. The Python version
@@ -50,15 +51,20 @@ public class MotherApp(headless: Boolean = false) : App(if (headless) HeadlessDr
         }
     }
 
-    override fun compose(): Sequence<Widget> = sequenceOf(header, chat, input, footer)
+    override fun compose(): Sequence<Widget> = sequenceOf(
+        Vertical(
+            children = listOf(header, chat, input, footer),
+            heights = listOf(
+                Scalar(1.0, LengthUnit.Cells),       // header
+                Scalar(1.0, LengthUnit.Fraction),    // chat takes all remaining
+                Scalar(1.0, LengthUnit.Cells),       // input
+                Scalar(1.0, LengthUnit.Cells),       // footer
+            ),
+        )
+    )
 
-    override fun arrangeBaseLayer(widgets: List<Widget>) {
-        compositor.placeAt(header, Region(0, 0, screenWidth, 1), Compositor.BASE)
-        // Reserve top row for header, bottom two for input + footer.
-        val chatHeight = (screenHeight - 4).coerceAtLeast(1)
-        compositor.placeAt(chat, Region(0, 1, screenWidth, chatHeight), Compositor.BASE)
-        compositor.placeAt(input, Region(0, screenHeight - 2, screenWidth, 1), Compositor.BASE)
-        compositor.placeAt(footer, Region(0, screenHeight - 1, screenWidth, 1), Compositor.BASE)
+    override fun start() {
+        super.start()
         // Focus the input by default so typing works immediately.
         if (focused !== input) setFocus(input)
     }

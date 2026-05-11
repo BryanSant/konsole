@@ -321,16 +321,30 @@ public abstract class App(
     public fun invalidate() { previousFrame = null }
 
     /**
-     * Hook for subclasses to customise base-layer layout. Default behaviour
-     * is the compositor's row-per-widget vertical stack — fine for most apps,
-     * but demos with full-screen rendering or hand-rolled grids override this
-     * to call [Compositor.placeAt] explicitly.
+     * Hook for subclasses to customise base-layer layout. Default behaviour:
+     *  - if [compose] returned a single widget, place it at the full viewport
+     *    so [tools.konsole.textual.widgets.Container]s arrange their children
+     *    over the whole screen.
+     *  - otherwise fall back to the compositor's row-per-widget vertical
+     *    stack (1 row per widget, full width) — preserves backwards
+     *    compatibility with Pilot tests that compose flat widget lists.
+     *
+     * Apps that want a different layout override this and call
+     * [Compositor.placeAt] explicitly.
      *
      * Invoked after [Compositor.clear] and before toast/overlay placement, so
      * overrides should not clear the compositor themselves.
      */
     protected open fun arrangeBaseLayer(widgets: List<Widget>) {
-        if (widgets.isNotEmpty()) compositor.arrange(widgets, Compositor.BASE)
+        when {
+            widgets.isEmpty() -> Unit
+            widgets.size == 1 -> compositor.placeAt(
+                widgets[0],
+                tools.konsole.rich.geometry.Region(0, 0, screenWidth, screenHeight),
+                Compositor.BASE,
+            )
+            else -> compositor.arrange(widgets, Compositor.BASE)
+        }
     }
 
     public fun renderFrame() {

@@ -6,14 +6,15 @@ import tools.konsole.rich.Segment
 import tools.konsole.rich.Strip
 import tools.konsole.rich.Style
 import tools.konsole.rich.Text
-import tools.konsole.rich.geometry.Region
 import tools.konsole.textual.app.App
 import tools.konsole.textual.binding.bindings
-import tools.konsole.textual.compositor.Compositor
+import tools.konsole.textual.css.LengthUnit
+import tools.konsole.textual.css.Scalar
 import tools.konsole.textual.driver.HeadlessDriver
 import tools.konsole.textual.driver.systemDriver
 import tools.konsole.textual.widget.Widget
 import tools.konsole.textual.widgets.Footer
+import tools.konsole.textual.widgets.Vertical
 
 /**
  * Merlin hand-held puzzle — toggle one switch and a cluster of neighbours
@@ -59,12 +60,15 @@ public class MerlinApp(headless: Boolean = false) : App(if (headless) HeadlessDr
     @Suppress("unused") public fun action_toggle_8() { board.press(8); requestRefresh() }
     @Suppress("unused") public fun action_toggle_9() { board.press(9); requestRefresh() }
 
-    override fun compose(): Sequence<Widget> = sequenceOf(board, footer)
-
-    override fun arrangeBaseLayer(widgets: List<Widget>) {
-        compositor.placeAt(board, Region(0, 0, screenWidth, screenHeight - 1), Compositor.BASE)
-        compositor.placeAt(footer, Region(0, screenHeight - 1, screenWidth, 1), Compositor.BASE)
-    }
+    override fun compose(): Sequence<Widget> = sequenceOf(
+        Vertical(
+            children = listOf(board, footer),
+            heights = listOf(
+                Scalar(1.0, LengthUnit.Fraction),    // board takes all remaining space
+                Scalar(1.0, LengthUnit.Cells),       // footer pinned to 1 row
+            ),
+        )
+    )
 }
 
 private class MerlinBoard : Widget() {

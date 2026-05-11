@@ -6,15 +6,16 @@ import tools.konsole.rich.Segment
 import tools.konsole.rich.Strip
 import tools.konsole.rich.Style
 import tools.konsole.rich.Text
-import tools.konsole.rich.geometry.Region
 import tools.konsole.textual.app.App
 import tools.konsole.textual.binding.bindings
-import tools.konsole.textual.compositor.Compositor
+import tools.konsole.textual.css.LengthUnit
+import tools.konsole.textual.css.Scalar
 import tools.konsole.textual.driver.HeadlessDriver
 import tools.konsole.textual.driver.systemDriver
 import tools.konsole.textual.widget.Widget
 import tools.konsole.textual.widgets.Footer
 import tools.konsole.textual.widgets.Header
+import tools.konsole.textual.widgets.Vertical
 
 /**
  * 5x5 light-flip puzzle. Toggle a cell and its four orthogonal neighbours;
@@ -69,13 +70,16 @@ public class FiveByFiveApp(headless: Boolean = false) : App(if (headless) Headle
     @Suppress("unused") public fun action_move_left() { grid.move(0, -1); requestRefresh() }
     @Suppress("unused") public fun action_move_right() { grid.move(0, 1); requestRefresh() }
 
-    override fun compose(): Sequence<Widget> = sequenceOf(header, grid, footer)
-
-    override fun arrangeBaseLayer(widgets: List<Widget>) {
-        compositor.placeAt(header, Region(0, 0, screenWidth, 1), Compositor.BASE)
-        compositor.placeAt(grid, Region(0, 1, screenWidth, screenHeight - 2), Compositor.BASE)
-        compositor.placeAt(footer, Region(0, screenHeight - 1, screenWidth, 1), Compositor.BASE)
-    }
+    override fun compose(): Sequence<Widget> = sequenceOf(
+        Vertical(
+            children = listOf(header, grid, footer),
+            heights = listOf(
+                Scalar(1.0, LengthUnit.Cells),
+                Scalar(1.0, LengthUnit.Fraction),
+                Scalar(1.0, LengthUnit.Cells),
+            ),
+        )
+    )
 }
 
 private class GameGrid : Widget() {
