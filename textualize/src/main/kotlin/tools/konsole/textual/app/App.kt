@@ -238,6 +238,10 @@ public abstract class App(
     public fun pushScreen(screen: Screen) {
         _screens.addFirst(screen)
         attach(screen)
+        // Start the screen's message-pump consumer and run any
+        // subclass-supplied start() hook (e.g. focus pull). MessagePump.start
+        // is idempotent so calling it again on screen pop / re-push is fine.
+        screen.start()
         screen.post(Mount())
     }
 
@@ -284,11 +288,9 @@ public abstract class App(
      */
     public fun action(name: String, vararg args: Any?): Boolean {
         val targets = listOfNotNull(focused, currentScreen, this as DOMNode)
+        val methodName = "action_$name"
         for (target in targets) {
-            val methodName = "action_$name"
-            val method = try {
-                target::class.java.declaredMethods.firstOrNull { it.name == methodName }
-            } catch (_: Throwable) { null } ?: continue
+            val method = findActionMethod(target::class.java, methodName) ?: continue
             try {
                 method.isAccessible = true
                 method.invoke(target, *args)
@@ -296,6 +298,25 @@ public abstract class App(
             } catch (_: Throwable) { /* try next */ }
         }
         return false
+    }
+
+    /**
+     * Walk the class hierarchy looking for a method named [methodName] with no
+     * required parameters. `Class.declaredMethods` only returns methods declared
+     * directly on the class — so an `action_dismiss` defined on `ModalScreen`
+     * would be invisible from a concrete subclass like `InputScreen`. This
+     * walks up to `Object` so inherited actions still dispatch.
+     */
+    private fun findActionMethod(start: Class<*>, methodName: String): java.lang.reflect.Method? {
+        var cls: Class<*>? = start
+        while (cls != null && cls != Any::class.java) {
+            try {
+                val m = cls.declaredMethods.firstOrNull { it.name == methodName && it.parameterCount == 0 }
+                if (m != null) return m
+            } catch (_: Throwable) { /* keep walking */ }
+            cls = cls.superclass
+        }
+        return null
     }
 
     /** Default built-in: `action_quit()` exits the app. */
