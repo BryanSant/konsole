@@ -55,20 +55,35 @@ if [ -z "$RESOLVED" ]; then
 fi
 
 # Compile so the runtime classpath references real .class files, then ask
-# Gradle to print it. The cached path is reused on repeat runs.
+# Gradle to print it (and the toolchain JDK launcher path). The cache is
+# reused on repeat runs unless a .kt source is newer.
 CLASSPATH_CACHE="examples/build/runtimeClasspath.txt"
-if [ ! -f "$CLASSPATH_CACHE" ] \
-   || [ "$EXAMPLES_DIR" -nt "$CLASSPATH_CACHE" ] \
-   || [ -n "$(find core/src rich/src textualize/src "$EXAMPLES_DIR" -newer "$CLASSPATH_CACHE" -name '*.kt' -print -quit 2>/dev/null)" ]; then
+LAUNCHER_CACHE="examples/build/javaLauncher.txt"
+need_rebuild=0
+if [ ! -f "$CLASSPATH_CACHE" ] || [ ! -f "$LAUNCHER_CACHE" ]; then
+    need_rebuild=1
+elif [ -n "$(find core/src rich/src textualize/src "$EXAMPLES_DIR" -newer "$CLASSPATH_CACHE" -name '*.kt' -print -quit 2>/dev/null)" ]; then
+    need_rebuild=1
+fi
+if [ "$need_rebuild" = "1" ]; then
     ./gradlew --console=plain -q :examples:assemble
     ./gradlew --console=plain -q :examples:printRuntimeClasspath > "$CLASSPATH_CACHE"
+    ./gradlew --console=plain -q :examples:printJavaLauncher    > "$LAUNCHER_CACHE"
 fi
 
 CLASSPATH="$(cat "$CLASSPATH_CACHE")"
+JAVA_BIN="$(cat "$LAUNCHER_CACHE")"
 MAIN_CLASS="tools.konsole.examples.${RESOLVED}Kt"
 
+if [ ! -x "$JAVA_BIN" ]; then
+    echo "demo.sh: toolchain java not found at '$JAVA_BIN'; falling back to PATH java." >&2
+    JAVA_BIN="java"
+fi
+
 # Exec into java directly so the JVM inherits the calling shell's TTY.
-exec java \
+# Using the toolchain JDK (Java 25) — JLine FFM requires Java 22+ and any
+# older `java` on the user's PATH would fall back to a dumb terminal.
+exec "$JAVA_BIN" \
     --enable-native-access=ALL-UNNAMED \
     -Dorg.jline.terminal.provider=ffm \
     -cp "$CLASSPATH" \

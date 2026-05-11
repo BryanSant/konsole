@@ -49,3 +49,15 @@ tasks.register("printRuntimeClasspath") {
     val cp = sourceSets.main.get().runtimeClasspath
     doLast { println(cp.asPath) }
 }
+
+// Print the toolchain-resolved java executable so a shell launcher uses the
+// same JDK Gradle compiles with (Java 25+ for FFM). Whatever `java` is on the
+// user's PATH may be older; FFM is final since Java 22.
+tasks.register("printJavaLauncher") {
+    group = "application"
+    description = "Print the absolute path to the toolchain's java binary."
+    val launcher = javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(25))
+    }
+    doLast { println(launcher.get().executablePath.asFile.absolutePath) }
+}
