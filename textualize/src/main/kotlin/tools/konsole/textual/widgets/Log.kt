@@ -38,8 +38,17 @@ public open class Log(
             lines.addLast(line)
             if (maxLines != null && lines.size > maxLines) lines.removeFirst()
         }
-        scrollY = (lines.size - 1).coerceAtLeast(0)
+        autoScrollToBottom()
         refresh()
+    }
+
+    // scrollY is the index of the *first visible* line, so the auto-scroll
+    // position is contentHeight - viewportHeight (not contentHeight - 1).
+    // The viewport height lives on `lastRegion`; until the first render
+    // there is no region, so leave scrollY untouched in that case.
+    private fun autoScrollToBottom() {
+        val viewportH = lastRegion?.height ?: return
+        scrollY = (lines.size - viewportH).coerceAtLeast(0)
     }
 
     /** Append [text] without a trailing newline. */
@@ -88,7 +97,7 @@ public open class Log(
     @Suppress("unused") public fun action_scroll_page_up() { scrollPageUp(lastRegion?.height ?: 10); refresh() }
     @Suppress("unused") public fun action_scroll_page_down() { scrollPageDown(lastRegion?.height ?: 10); refresh() }
     @Suppress("unused") public fun action_scroll_home() { scrollHome(); refresh() }
-    @Suppress("unused") public fun action_scroll_end() { scrollEnd(); refresh() }
+    @Suppress("unused") public fun action_scroll_end() { autoScrollToBottom(); refresh() }
 
     override fun render(): Renderable = Text(lines.joinToString("\n"))
 }

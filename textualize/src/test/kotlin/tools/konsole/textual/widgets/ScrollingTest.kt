@@ -90,6 +90,30 @@ class ScrollingTest : StringSpec({
         log.scrollY shouldBe 4  // contentHeight - 1
     }
 
+    "Log auto-scroll on write puts the last lines inside the viewport, not the last line at the top" {
+        // Regression for the CodeBrowser file-preview bug: write() used to
+        // pin scrollY to contentHeight - 1, which is the *last line's*
+        // index. Combined with renderStrips(width, scrollY, region.height)
+        // that puts the final line at the top of the pane and leaves every
+        // row below it empty. Auto-scroll must instead position scrollY at
+        // contentHeight - viewportHeight so the bottom of content is at
+        // the bottom of the viewport.
+        val log = Log()
+        // Establish a region first — write() reads lastRegion to know the
+        // viewport height. Without a placement, autoScrollToBottom is a no-op.
+        val compositor = Compositor(Region(0, 0, 80, 5))
+        compositor.placeAt(log, Region(0, 0, 80, 5))
+        compositor.render()  // sets log.lastRegion
+        for (i in 0 until 20) log.write("line $i")
+        val strips = compositor.render()
+        val flat = strips.joinToString("\n") { it.segments.joinToString("") { s -> s.text } }
+        // Last 5 lines should fill the 5-row viewport.
+        flat shouldContain "line 15"
+        flat shouldContain "line 19"
+        flat shouldNotContain "line 14"
+        flat shouldNotContain "line 0 "
+    }
+
     "compositor passes scrollY+localY to widget.renderLine for Scrollable widgets" {
         val log = RichLog()
         for (i in 0 until 100) log.write("L$i")
