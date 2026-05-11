@@ -42,7 +42,7 @@ public open class MessagePump(
     public val isRunning: Boolean get() = consumerJob?.isActive == true
 
     /** Begin draining the mailbox. Idempotent. */
-    public fun start() {
+    public open fun start() {
         if (consumerJob?.isActive == true) return
         consumerJob = scope.launch {
             mailbox.consumeEach { msg ->
