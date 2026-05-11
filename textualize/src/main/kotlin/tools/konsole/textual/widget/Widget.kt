@@ -1,5 +1,6 @@
 package tools.konsole.textual.widget
 
+import kotlinx.coroutines.Job
 import tools.konsole.rich.Renderable
 import tools.konsole.rich.Segment
 import tools.konsole.rich.Strip
@@ -57,13 +58,26 @@ public abstract class Widget(
      * state every time the stylesheet is queried. Selectors like
      * `Button:hover` re-match per frame against this set, so styles update
      * as the user focuses / hovers / disables widgets.
+     *
+     * Returns one of 16 shared, immutable sets keyed by the four boolean
+     * flags — no allocation per read even though the CSS resolver may call
+     * this for every widget on every frame.
      */
-    override val activePseudoClasses: Set<String> get() = buildSet {
-        if (hasFocus) add("focus")
-        if (isHovered) add("hover")
-        if (isPressed) add("active")
-        if (disabled) add("disabled") else add("enabled")
+    override val activePseudoClasses: Set<String> get() {
+        val key = (if (hasFocus) 1 else 0) or
+                  (if (isHovered) 2 else 0) or
+                  (if (isPressed) 4 else 0) or
+                  (if (disabled) 8 else 0)
+        return PSEUDO_CLASS_SETS[key]
     }
+
+    /**
+     * Single-shot timer that resets [isPressed] back to false after a Click
+     * event. Kept as a field so a second click on the same widget can cancel
+     * the prior timer rather than stack a parallel coroutine on the App's
+     * root scope — see [tools.konsole.textual.app.App] click handling.
+     */
+    internal var pressedTimer: Job? = null
 
     /**
      * The screen-space region this widget was last placed at, set by the
@@ -202,4 +216,16 @@ public abstract class Widget(
     /** True if any of this widget's [bindings] match the [event]. */
     public fun hasBindingFor(event: tools.konsole.textual.events.Key): Boolean =
         bindings.match(event) != null
+
+    private companion object {
+        // 4 boolean flags → 16 distinct {focus/hover/active/disabled/enabled} sets.
+        private val PSEUDO_CLASS_SETS: Array<Set<String>> = Array(16) { key ->
+            buildSet {
+                if (key and 1 != 0) add("focus")
+                if (key and 2 != 0) add("hover")
+                if (key and 4 != 0) add("active")
+                if (key and 8 != 0) add("disabled") else add("enabled")
+            }
+        }
+    }
 }

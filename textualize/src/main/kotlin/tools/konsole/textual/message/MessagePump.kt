@@ -34,7 +34,10 @@ public open class MessagePump(
     public val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
 
-    private val mailbox: Channel<Message> = Channel(Channel.UNLIMITED)
+    // Bounded so a stuck consumer can't grow the heap without limit.
+    // post() uses trySend, so overflow surfaces as `false` rather than
+    // suspending the producer (and risking deadlock if producer == consumer).
+    private val mailbox: Channel<Message> = Channel(capacity = MAILBOX_CAPACITY)
     private val handlers: MutableMap<KClass<out Message>, MutableList<suspend (Message) -> Unit>> = mutableMapOf()
     private var consumerJob: Job? = null
 
@@ -96,6 +99,15 @@ public open class MessagePump(
             if (!isActive) break
             block()
         }
+    }
+
+    public companion object {
+        /**
+         * Per-pump mailbox capacity. Large enough that input bursts don't drop
+         * events under normal load, small enough that a stuck handler can't
+         * exhaust the heap. Hit it and you have an upstream bug worth finding.
+         */
+        public const val MAILBOX_CAPACITY: Int = 1024
     }
 
     private suspend fun dispatch(message: Message) {

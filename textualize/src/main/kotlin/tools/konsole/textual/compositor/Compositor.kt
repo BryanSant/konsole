@@ -254,25 +254,58 @@ public class Compositor(initialViewport: Region) {
         return best?.widget
     }
 
+    // Reusable cell grid — sized lazily and on viewport resize. Avoids
+    // re-allocating viewport.height × viewport.width Cell records per frame.
+    private var rowBuffer: Array<Array<Cell>> = emptyArray()
+    private var rowBufferWidth: Int = 0
+
+    private fun ensureBuffer(width: Int, height: Int): Array<Array<Cell>> {
+        if (rowBufferWidth == width && rowBuffer.size == height) {
+            for (y in 0 until height) {
+                val row = rowBuffer[y]
+                for (x in 0 until width) row[x] = Cell.EMPTY
+            }
+            return rowBuffer
+        }
+        rowBuffer = Array(height) { Array(width) { Cell.EMPTY } }
+        rowBufferWidth = width
+        return rowBuffer
+    }
+
     /** Render every layer back-to-front, returning the viewport's row strips. */
     public fun render(): List<Strip> {
-        val rows = MutableList(viewport.height) { mutableListOf<Cell>() }
-        for (rowIdx in 0 until viewport.height) {
-            for (col in 0 until viewport.width) rows[rowIdx].add(Cell.EMPTY)
-        }
+        val width = viewport.width.coerceAtLeast(0)
+        val height = viewport.height.coerceAtLeast(0)
+        val rows = ensureBuffer(width, height)
         // Sort placements by layer z-order so higher layers overwrite lower.
         val sorted = _placements.sortedBy { it.layer.zOrder }
         for (p in sorted) {
             renderInto(p, rows)
         }
-        return rows.map { row ->
-            val segments = mutableListOf<Segment>()
-            for (cell in row) segments += Segment(cell.ch.toString(), cell.style)
-            Strip.of(segments).adjustCellLength(viewport.width)
+        // RLE-merge consecutive same-style cells into one Segment per run.
+        // A typical UI row is a few contiguous styled spans, not 80 distinct
+        // cells — this cuts Segment allocations by ~10–40× per frame.
+        return List(height) { y ->
+            val row = rows[y]
+            if (width == 0) return@List Strip.EMPTY
+            val segments = ArrayList<Segment>()
+            var col = 0
+            while (col < width) {
+                val style = row[col].style
+                val sb = StringBuilder()
+                sb.append(row[col].ch)
+                col++
+                while (col < width && row[col].style == style) {
+                    sb.append(row[col].ch)
+                    col++
+                }
+                segments += Segment(sb.toString(), style)
+            }
+            Strip.of(segments).adjustCellLength(width)
         }
     }
 
-    private fun renderInto(p: Placement, rows: MutableList<MutableList<Cell>>) {
+    private fun renderInto(p: Placement, rows: Array<Array<Cell>>) {
         // Expose the placement region to the widget so its render() can size
         // content to the actual available width/height.
         p.widget.lastRegion = p.region

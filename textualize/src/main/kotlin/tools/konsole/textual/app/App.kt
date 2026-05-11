@@ -524,9 +524,15 @@ public abstract class App(
                 updateHover(target)
                 target?.let {
                     it.isPressed = true
-                    rootScope.launch {
+                    // Rapid clicks on the same widget should reset, not stack:
+                    // cancel any in-flight pressed-timer so the 80 ms window
+                    // restarts cleanly and a previous coroutine can't flip
+                    // isPressed back to false mid-press.
+                    it.pressedTimer?.cancel()
+                    it.pressedTimer = rootScope.launch {
                         delay(80)
                         it.isPressed = false
+                        it.pressedTimer = null
                         requestRefresh()
                     }
                     it.post(event)
