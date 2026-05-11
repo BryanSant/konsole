@@ -91,6 +91,13 @@ public abstract class App(
     public val screens: List<Screen> get() = _screens.toList()
     public val currentScreen: Screen? get() = _screens.firstOrNull()
 
+    // Parallel stack of "what was focused before this screen was pushed". On
+    // pop we restore that widget so dismissing a modal returns focus to the
+    // underlying screen rather than leaving `focused` dangling on a detached
+    // widget. Without this, keys typed after a modal closes are routed to
+    // the popped Input/Button and never reach app-level bindings.
+    private val _focusStack: ArrayDeque<Widget?> = ArrayDeque()
+
     @Volatile private var exited = false
 
     /**
@@ -236,6 +243,7 @@ public abstract class App(
 
     /** Push [screen] onto the stack. */
     public fun pushScreen(screen: Screen) {
+        _focusStack.addFirst(focused)
         _screens.addFirst(screen)
         attach(screen)
         // Start the screen's message-pump consumer and run any
@@ -249,6 +257,14 @@ public abstract class App(
     public fun popScreen(): Screen? {
         val s = _screens.removeFirstOrNull()
         if (s != null) { s.post(Unmount()); detach(s) }
+        // Restore focus to whatever owned it before this screen was pushed.
+        // Clear first so a stale reference into the popped screen can't leak
+        // into the dispatcher between detach and the restore call below.
+        setFocus(null)
+        val previous = _focusStack.removeFirstOrNull()
+        if (previous != null && _screens.any { sc -> previous === sc || previous.ancestors.contains(sc) }) {
+            setFocus(previous)
+        }
         return s
     }
 

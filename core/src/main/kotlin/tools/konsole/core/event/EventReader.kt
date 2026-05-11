@@ -108,14 +108,53 @@ internal class EventReader(private val jline: JlineTerminal) {
                     } catch (_: java.io.InterruptedIOException) {
                         break
                     }
-                    if (b < 0) break
-                    val ev = parser.advance(b) ?: continue
-                    _events.emit(ev)
+                    if (b == EOF) break
+                    var ev = parser.advance(b)
+                    // If the parser needs more bytes (lone Esc, partial CSI),
+                    // give the kernel buffer a brief window to deliver them.
+                    // No follow-up after the timeout = the user typed a bare
+                    // Esc (or the sequence is malformed); flush() forces the
+                    // parser to resolve so the event isn't held until the
+                    // *next* keypress. Without this, pressing Esc once does
+                    // nothing and pressing it twice fires the first Esc.
+                    while (ev == null && !stopped) {
+                        val next: Int = try {
+                            reader.read(ESC_TIMEOUT_MS)
+                        } catch (_: InterruptedException) {
+                            break
+                        } catch (_: java.io.InterruptedIOException) {
+                            break
+                        }
+                        when (next) {
+                            READ_EXPIRED -> {
+                                ev = parser.flush()
+                                break
+                            }
+                            EOF -> {
+                                stopped = true
+                                break
+                            }
+                            else -> ev = parser.advance(next)
+                        }
+                    }
+                    if (ev != null) _events.emit(ev)
                 }
             } finally {
                 cursorPositions.close()
             }
         }
+    }
+
+    private companion object {
+        // JLine NonBlockingReader sentinels.
+        private const val EOF: Int = -1
+        private const val READ_EXPIRED: Int = -2
+
+        // How long to wait for follow-up bytes after the parser signals it
+        // needs more. 40 ms is comfortably above LAN/SSH latency for a single
+        // CSI sequence's worth of bytes while still feeling instant for a
+        // bare Esc keypress.
+        private const val ESC_TIMEOUT_MS: Long = 40L
     }
 
     fun shutdown() {
