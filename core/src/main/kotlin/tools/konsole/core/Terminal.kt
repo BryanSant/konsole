@@ -156,14 +156,22 @@ public class Terminal internal constructor(
 
     public companion object {
         /**
-         * Force raw-mode termios to block on reads. After [org.jline.terminal.Terminal.enterRawMode],
-         * JLine 4.1.0 leaves `VMIN=0, VTIME=1` (poll with 100ms timeout). The
-         * kernel then returns 0 bytes after each timeout, which Java's
-         * `FileInputStream.read()` translates into `-1` (EOF). That kills every
-         * input pump as soon as the buffer drains.
+         * Force raw-mode termios into a configuration suitable for a TUI app
+         * that handles keys itself. After [org.jline.terminal.Terminal.enterRawMode]
+         * JLine 4.1.0 leaves two settings that hurt our use case:
          *
-         * We override to `VMIN=1, VTIME=0` so `read()` actually blocks until
-         * at least one byte is available — the normal "raw cbreak" termios.
+         *  - `VMIN=0, VTIME=1` (poll with 100ms timeout). The kernel returns
+         *    0 bytes after each timeout, which Java's `FileInputStream.read()`
+         *    translates into `-1` (EOF). That kills every input pump as soon
+         *    as the buffer drains. We override to `VMIN=1, VTIME=0` so
+         *    `read()` actually blocks until at least one byte is available
+         *    — the normal "raw cbreak" termios.
+         *
+         *  - `ISIG` left enabled, which means Ctrl+C / Ctrl+\ / Ctrl+Z still
+         *    generate SIGINT/SIGQUIT/SIGTSTP and kill the JVM out from under
+         *    us before our cleanup can run. TUI apps want those keys
+         *    delivered as bytes so bindings can react. We turn ISIG off; the
+         *    saved attributes restored on shutdown bring it back.
          *
          * Call this on any [org.jline.terminal.Terminal] right after
          * [org.jline.terminal.Terminal.enterRawMode].
@@ -173,6 +181,7 @@ public class Terminal internal constructor(
             val attrs = jline.attributes
             attrs.setControlChar(Attributes.ControlChar.VMIN, 1)
             attrs.setControlChar(Attributes.ControlChar.VTIME, 0)
+            attrs.setLocalFlag(Attributes.LocalFlag.ISIG, false)
             jline.attributes = attrs
         }
 

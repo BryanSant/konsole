@@ -35,6 +35,8 @@ public class MotherApp(headless: Boolean = false) : App(if (headless) HeadlessDr
     private val input = Input(placeholder = "Type a question and press Enter…", id = "prompt")
     private val footer = Footer(bindings = bindings("Ctrl+C" to "quit"))
 
+    override val bindings = bindings("ctrl+c" to "quit")
+
     init {
         input.start()
         input.onMessage<Input.Submitted> { evt ->
