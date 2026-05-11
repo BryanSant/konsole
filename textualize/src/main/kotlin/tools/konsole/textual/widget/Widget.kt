@@ -45,6 +45,18 @@ public abstract class Widget(
     public var isPressed: Boolean = false
         internal set
 
+    /**
+     * The screen-space region this widget was last placed at, set by the
+     * [tools.konsole.textual.compositor.Compositor] during the most recent
+     * render. `null` if the widget has never been placed.
+     *
+     * Widgets that need to size their content to their actual dimensions
+     * (Sparkline, DataTable, Markdown viewport) can consult this rather than
+     * synthesising an 80-wide console for [render].
+     */
+    public var lastRegion: tools.konsole.rich.geometry.Region? = null
+        internal set
+
     /** Class-level bindings discovered by walking class hierarchy / `BINDINGS` companion fields. */
     public open val bindings: BindingsMap = BindingsMap()
 

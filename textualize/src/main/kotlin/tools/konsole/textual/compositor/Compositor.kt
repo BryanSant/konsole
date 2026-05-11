@@ -181,6 +181,9 @@ public class Compositor(initialViewport: Region) {
     }
 
     private fun renderInto(p: Placement, rows: MutableList<MutableList<Cell>>) {
+        // Expose the placement region to the widget so its render() can size
+        // content to the actual available width/height.
+        p.widget.lastRegion = p.region
         val widgetWidth = p.region.width.coerceAtLeast(0)
         if (widgetWidth == 0) return
         for (localY in 0 until p.region.height) {

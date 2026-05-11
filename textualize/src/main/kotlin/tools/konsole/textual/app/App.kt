@@ -17,8 +17,12 @@ import tools.konsole.textual.compositor.Compositor
 import tools.konsole.textual.compositor.StripSerializer
 import tools.konsole.textual.driver.Driver
 import tools.konsole.textual.driver.HeadlessDriver
+import tools.konsole.core.event.KeyCode
+import tools.konsole.core.event.KeyModifiers
+import tools.konsole.textual.events.Blur
 import tools.konsole.textual.events.Click
 import tools.konsole.textual.events.Event
+import tools.konsole.textual.events.Focus
 import tools.konsole.textual.events.Key
 import tools.konsole.textual.events.Mount
 import tools.konsole.textual.events.MouseMove
@@ -77,6 +81,43 @@ public abstract class App(
     public val currentScreen: Screen? get() = _screens.firstOrNull()
 
     @Volatile private var exited = false
+
+    /**
+     * Currently focused widget — receives keyboard input first. `null` means
+     * no focus and keys flow straight to the current screen.
+     */
+    public var focused: Widget? = null
+        private set
+
+    /** Move keyboard focus to [widget], or clear it with `null`. */
+    public fun setFocus(widget: Widget?) {
+        if (focused === widget) return
+        focused?.let { it.hasFocus = false; it.post(Blur()) }
+        focused = widget
+        widget?.let { it.hasFocus = true; it.post(Focus()) }
+        dirty = true
+    }
+
+    /** Move focus to the next focusable widget in tab order (DOM pre-order). */
+    public fun focusNext() {
+        val focusable = collectFocusable()
+        if (focusable.isEmpty()) return
+        val idx = focusable.indexOf(focused)
+        setFocus(focusable[if (idx < 0) 0 else (idx + 1) % focusable.size])
+    }
+
+    /** Move focus to the previous focusable widget in tab order. */
+    public fun focusPrevious() {
+        val focusable = collectFocusable()
+        if (focusable.isEmpty()) return
+        val idx = focusable.indexOf(focused)
+        setFocus(focusable[if (idx < 0) focusable.lastIndex else (idx - 1 + focusable.size) % focusable.size])
+    }
+
+    private fun collectFocusable(): List<Widget> {
+        val screen = currentScreen ?: return emptyList()
+        return screen.walk().filterIsInstance<Widget>().filter { it.canFocus }.toList()
+    }
 
     /**
      * Screen dimensions in cells. Updated by [Resize] events from the driver.
@@ -167,6 +208,34 @@ public abstract class App(
 
     /** Mark the screen as needing a fresh paint. Called by [Widget.refresh] indirectly. */
     public fun requestRefresh() { dirty = true }
+
+    /**
+     * Dispatch a named action. Walks focused → currentScreen → this App
+     * looking for an `action_<name>` method via reflection; calls the first
+     * match. Returns true if an action method was found and ran.
+     *
+     * Mirrors Python textual's `action_*` discovery — bindings declare
+     * `"q"` → `"quit"`, and the App's `action_quit()` method runs.
+     */
+    public fun action(name: String, vararg args: Any?): Boolean {
+        val targets = listOfNotNull(focused, currentScreen, this as DOMNode)
+        for (target in targets) {
+            val methodName = "action_$name"
+            val method = try {
+                target::class.java.declaredMethods.firstOrNull { it.name == methodName }
+            } catch (_: Throwable) { null } ?: continue
+            try {
+                method.isAccessible = true
+                method.invoke(target, *args)
+                return true
+            } catch (_: Throwable) { /* try next */ }
+        }
+        return false
+    }
+
+    /** Default built-in: `action_quit()` exits the app. */
+    @Suppress("unused")
+    public open fun action_quit() { exit() }
 
     /** Last widget the pointer was over — used to clear the previous hover when the pointer moves. */
     private var hoveredWidget: Widget? = null
@@ -293,9 +362,30 @@ public abstract class App(
                 dirty = true
             }
             is Key -> {
-                currentScreen?.post(event)
-                val match = bindings.match(event) ?: currentScreen?.bindings?.match(event)
-                if (match != null && match.action == "quit") exit()
+                // Tab / Shift+Tab navigate focus before bindings run.
+                if (event.code == KeyCode.Tab && event.modifiers.bits == 0) {
+                    focusNext()
+                    dirty = true
+                    return
+                }
+                if (event.code == KeyCode.BackTab) {
+                    focusPrevious()
+                    dirty = true
+                    return
+                }
+                // Bindings: focused → screen → app, action_<name> dispatch first.
+                val match = focused?.bindings?.match(event)
+                    ?: currentScreen?.bindings?.match(event)
+                    ?: bindings.match(event)
+                if (match != null) {
+                    if (!action(match.action)) {
+                        // Built-in fallback for "quit".
+                        if (match.action == "quit") exit()
+                    }
+                } else {
+                    // Forward to focused widget first, then screen.
+                    focused?.post(event) ?: currentScreen?.post(event)
+                }
                 dirty = true
             }
             else -> {
