@@ -64,6 +64,20 @@ public data class Styles(
     public val layers: List<String>? = null,
 
     public val opacity: Double? = null,
+
+    // ---- Grid layout (only meaningful when [layout] is [LayoutKind.Grid]) ----
+    /** `grid-size: <cols> <rows>` — `<rows>` defaults to 1 when omitted. */
+    public val gridSize: Pair<Int, Int>? = null,
+    /** `grid-rows: <track-list>` — height of each row track. */
+    public val gridRows: List<Scalar>? = null,
+    /** `grid-columns: <track-list>` — width of each column track. */
+    public val gridColumns: List<Scalar>? = null,
+    /** `grid-gutter: <h> <v>` — spacing between cells (horizontal, vertical). */
+    public val gridGutter: Pair<Int, Int>? = null,
+    /** `column-span: <int>` — number of columns this child occupies. Default 1. */
+    public val columnSpan: Int? = null,
+    /** `row-span: <int>` — number of rows this child occupies. Default 1. */
+    public val rowSpan: Int? = null,
 ) {
     /** Right-side fields override left-side; nulls fall through. Mirrors CSS rule overlay. */
     public operator fun plus(other: Styles): Styles = Styles(
@@ -90,6 +104,12 @@ public data class Styles(
         layer = other.layer ?: layer,
         layers = other.layers ?: layers,
         opacity = other.opacity ?: opacity,
+        gridSize = other.gridSize ?: gridSize,
+        gridRows = other.gridRows ?: gridRows,
+        gridColumns = other.gridColumns ?: gridColumns,
+        gridGutter = other.gridGutter ?: gridGutter,
+        columnSpan = other.columnSpan ?: columnSpan,
+        rowSpan = other.rowSpan ?: rowSpan,
     )
 
     public companion object {

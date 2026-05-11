@@ -59,8 +59,40 @@ public object StylesBuilder {
 
             "opacity" -> Styles(opacity = v.toDoubleOrNull())
 
+            "grid-size" -> Styles(gridSize = parseGridSize(v))
+            "grid-rows" -> Styles(gridRows = parseTrackList(v))
+            "grid-columns" -> Styles(gridColumns = parseTrackList(v))
+            "grid-gutter" -> Styles(gridGutter = parseGridGutter(v))
+            "column-span" -> Styles(columnSpan = v.toIntOrNull())
+            "row-span" -> Styles(rowSpan = v.toIntOrNull())
+
             else -> Styles()
         }
+    }
+
+    private fun parseGridSize(v: String): Pair<Int, Int>? {
+        val parts = v.trim().split(Regex("\\s+")).mapNotNull { it.toIntOrNull() }
+        return when (parts.size) {
+            1 -> parts[0] to 1
+            2 -> parts[0] to parts[1]
+            else -> null
+        }
+    }
+
+    private fun parseGridGutter(v: String): Pair<Int, Int>? {
+        val parts = v.trim().split(Regex("\\s+")).mapNotNull { it.toIntOrNull() }
+        return when (parts.size) {
+            1 -> parts[0] to parts[0]
+            2 -> parts[0] to parts[1]
+            else -> null
+        }
+    }
+
+    private fun parseTrackList(v: String): List<Scalar>? {
+        val parts = v.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        if (parts.isEmpty()) return null
+        val scalars = parts.mapNotNull { Scalar.parse(it) }
+        return if (scalars.size != parts.size) null else scalars
     }
 
     private fun parseDisplay(v: String): Display? = when (v) {

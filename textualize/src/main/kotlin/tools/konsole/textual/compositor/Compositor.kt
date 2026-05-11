@@ -69,21 +69,54 @@ public class Compositor(initialViewport: Region) {
     private val _placements: MutableList<Placement> = mutableListOf()
     public val placements: List<Placement> get() = _placements.toList()
 
-    /** Place [widget] explicitly at [region] on [layer]. */
+    /**
+     * Place [widget] explicitly at [region] on [layer]. If [widget] is a
+     * [tools.konsole.textual.widgets.Container], its children are recursively
+     * arranged inside [region] using the matching
+     * [tools.konsole.textual.layouts.Layout]. The container itself is still
+     * registered so hit-testing / overlay anchoring against it work, but its
+     * own [Widget.render] is expected to be transparent (Containers ship with
+     * an empty default [Widget.render]).
+     */
     public fun placeAt(widget: Widget, region: Region, layer: Layer = BASE) {
         _placements += Placement(widget, region, layer)
+        if (widget is tools.konsole.textual.widgets.Container) {
+            recursivelyPlaceContainerChildren(widget, region, layer)
+        }
+    }
+
+    private fun recursivelyPlaceContainerChildren(
+        container: tools.konsole.textual.widgets.Container,
+        region: Region,
+        layer: Layer,
+    ) {
+        val children = container.containerChildren
+        if (children.isEmpty()) return
+        val pairs = children.map { it to container.childStyles(it) }
+        val layout = tools.konsole.textual.layouts.Layout.forKind(container.layout)
+        val placements = if (container.layout == tools.konsole.textual.css.LayoutKind.Grid) {
+            tools.konsole.textual.layouts.GridLayout
+                .arrangeWithParent(region, pairs, container.containerStyles)
+        } else {
+            layout.arrange(region, pairs)
+        }
+        for (p in placements) {
+            placeAt(p.widget, p.region, layer)  // recurses into nested containers
+        }
     }
 
     /**
      * Vertical-stack layout: give each widget the full viewport width and
      * one row of height. Preserves the Phase 7 behaviour for existing call
-     * sites that don't care about layering.
+     * sites that don't care about layering. Each widget is routed through
+     * [placeAt] so [tools.konsole.textual.widgets.Container] children
+     * recurse into their declared layout.
      */
     public fun arrange(widgets: List<Widget>, layer: Layer = BASE) {
         _placements.clear()
         var y = viewport.y
         for (w in widgets) {
-            _placements += Placement(w, Region(viewport.x, y, viewport.width, 1), layer)
+            placeAt(w, Region(viewport.x, y, viewport.width, 1), layer)
             y += 1
             if (y >= viewport.bottom) break
         }
