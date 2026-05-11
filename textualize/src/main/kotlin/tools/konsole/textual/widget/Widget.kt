@@ -37,6 +37,14 @@ public abstract class Widget(
     public var hasFocus: Boolean = false
         internal set
 
+    /** Pointer is hovering over this widget. Set by the App's MouseMove handler. */
+    public var isHovered: Boolean = false
+        internal set
+
+    /** Pointer button is currently held down on this widget. Set on mouse-down, cleared on mouse-up. */
+    public var isPressed: Boolean = false
+        internal set
+
     /** Class-level bindings discovered by walking class hierarchy / `BINDINGS` companion fields. */
     public open val bindings: BindingsMap = BindingsMap()
 

@@ -30,7 +30,20 @@ import tools.konsole.textual.widget.Widget
  *   - widget Z-index within a layer (currently same-layer placements render
  *     in insertion order)
  */
-public class Compositor(public val viewport: Region) {
+public class Compositor(initialViewport: Region) {
+
+    /** Current viewport. Use [resize] to change it. */
+    public var viewport: Region = initialViewport
+        private set
+
+    /**
+     * Resize the rendering viewport. Existing placements are preserved but
+     * may now sit outside the new bounds; callers typically follow up with
+     * [clear] + a fresh `arrange()` from their App's render loop.
+     */
+    public fun resize(newViewport: Region) {
+        viewport = newViewport
+    }
 
     /** A named depth layer. Higher [zOrder] renders on top of lower. */
     public data class Layer(public val name: String, public val zOrder: Int) : Comparable<Layer> {

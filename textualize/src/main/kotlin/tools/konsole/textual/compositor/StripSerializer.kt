@@ -45,6 +45,50 @@ public object StripSerializer {
         return sb.toString()
     }
 
+    /**
+     * Diff [old] vs [new] row-by-row and emit only rows that differ.
+     * For each changed row, position the cursor at the start of the row
+     * and write the new strip. Same-row rendering means same SGR runs,
+     * so consecutive identical strips are skipped entirely — typical
+     * idle frames send zero bytes.
+     */
+    public fun serializeDiff(
+        old: List<Strip>,
+        new: List<Strip>,
+        originX: Int = 0,
+        originY: Int = 0,
+    ): String {
+        val sb = StringBuilder()
+        val rows = minOf(old.size, new.size)
+        var wroteAny = false
+        for (i in 0 until rows) {
+            if (stripsEqual(old[i], new[i])) continue
+            sb.append(Ansi.CSI).append(originY + i + 1).append(';').append(originX + 1).append('H')
+            writeStrip(sb, new[i])
+            wroteAny = true
+        }
+        // Rows added beyond `old.size` (terminal grew) — emit them fresh.
+        for (i in rows until new.size) {
+            sb.append(Ansi.CSI).append(originY + i + 1).append(';').append(originX + 1).append('H')
+            writeStrip(sb, new[i])
+            wroteAny = true
+        }
+        if (wroteAny) sb.append(Ansi.CSI).append("0m")
+        return sb.toString()
+    }
+
+    private fun stripsEqual(a: Strip, b: Strip): Boolean {
+        if (a.cellLength != b.cellLength) return false
+        if (a.segments.size != b.segments.size) return false
+        for (i in a.segments.indices) {
+            val sa = a.segments[i]
+            val sb = b.segments[i]
+            if (sa.text != sb.text) return false
+            if (sa.style != sb.style) return false
+        }
+        return true
+    }
+
     /** Render a single [strip] inline at the current cursor position. */
     public fun serializeInline(strip: Strip): String {
         val sb = StringBuilder()

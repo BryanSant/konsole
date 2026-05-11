@@ -48,18 +48,44 @@ public open class Button(
 
     override fun render(): Renderable {
         val text = Markup.parse(label)
-        return Align(text, align = Justify.Center, style = styleFor(variant, disabled))
+        return Align(text, align = Justify.Center, style = styleFor(variant, disabled, isHovered, isPressed))
     }
 
-    private fun styleFor(variant: ButtonVariant, disabled: Boolean): Style {
-        val base = when (variant) {
-            ButtonVariant.Default -> Style(color = Color.White, bgcolor = Color.Rgb(0x3a, 0x3d, 0x43), bold = true)
-            ButtonVariant.Primary -> Style(color = Color.White, bgcolor = Color.Rgb(0x00, 0x4f, 0x9f), bold = true)
-            ButtonVariant.Success -> Style(color = Color.White, bgcolor = Color.Rgb(0x2e, 0x86, 0x36), bold = true)
-            ButtonVariant.Warning -> Style(color = Color.Black, bgcolor = Color.Rgb(0xe9, 0x9d, 0x42), bold = true)
-            ButtonVariant.Error -> Style(color = Color.White, bgcolor = Color.Rgb(0xe5, 0x5c, 0x5c), bold = true)
+    private fun styleFor(variant: ButtonVariant, disabled: Boolean, hovered: Boolean, pressed: Boolean): Style {
+        // Per-variant base palette.
+        val (fg, bg) = when (variant) {
+            ButtonVariant.Default -> Color.White to Color.Rgb(0x3a, 0x3d, 0x43)
+            ButtonVariant.Primary -> Color.White to Color.Rgb(0x00, 0x4f, 0x9f)
+            ButtonVariant.Success -> Color.White to Color.Rgb(0x2e, 0x86, 0x36)
+            ButtonVariant.Warning -> Color.Black to Color.Rgb(0xe9, 0x9d, 0x42)
+            ButtonVariant.Error -> Color.White to Color.Rgb(0xe5, 0x5c, 0x5c)
         }
-        return if (disabled) base.copy(dim = true) else base
+        val effectiveBg = when {
+            disabled -> bg                                     // unchanged; dim flag adjusts brightness below
+            pressed -> darken(bg, factor = 0.7)                 // pressed: darker than base
+            hovered -> lighten(bg, factor = 1.15)               // hovered: slightly brighter
+            else -> bg
+        }
+        val style = Style(color = fg, bgcolor = effectiveBg, bold = true)
+        return if (disabled) style.copy(dim = true) else style
+    }
+
+    private fun darken(color: Color, factor: Double): Color = when (color) {
+        is Color.Rgb -> Color.Rgb(
+            (color.r * factor).toInt().coerceIn(0, 255),
+            (color.g * factor).toInt().coerceIn(0, 255),
+            (color.b * factor).toInt().coerceIn(0, 255),
+        )
+        else -> color
+    }
+
+    private fun lighten(color: Color, factor: Double): Color = when (color) {
+        is Color.Rgb -> Color.Rgb(
+            (color.r * factor).toInt().coerceAtMost(255),
+            (color.g * factor).toInt().coerceAtMost(255),
+            (color.b * factor).toInt().coerceAtMost(255),
+        )
+        else -> color
     }
 
     /** Posted when the button is pressed. Carries a reference to the originating [button]. */

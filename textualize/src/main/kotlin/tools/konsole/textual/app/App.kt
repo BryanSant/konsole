@@ -168,11 +168,27 @@ public abstract class App(
     /** Mark the screen as needing a fresh paint. Called by [Widget.refresh] indirectly. */
     public fun requestRefresh() { dirty = true }
 
+    /** Last widget the pointer was over — used to clear the previous hover when the pointer moves. */
+    private var hoveredWidget: Widget? = null
+
+    private fun updateHover(target: Widget?) {
+        if (hoveredWidget === target) return
+        hoveredWidget?.isHovered = false
+        target?.isHovered = true
+        hoveredWidget = target
+    }
+
     /**
      * Render one frame: collect visible widgets, lay them out on the [compositor],
      * serialise to ANSI, and push through the driver. Public so tests / `Pilot`
      * can force a paint without waiting for the tick loop.
      */
+    /** Previous frame's strips — kept for dirty-region diffing. `null` = next paint is full. */
+    @Volatile private var previousFrame: List<tools.konsole.rich.Strip>? = null
+
+    /** Force the next [renderFrame] to repaint the entire screen (skip diffing). */
+    public fun invalidate() { previousFrame = null }
+
     public fun renderFrame() {
         ensureMounted()
         compositor.clear()
@@ -190,8 +206,18 @@ public abstract class App(
             }
         }
         val strips = compositor.render()
-        driver.write(StripSerializer.serialize(strips, originX = 0, originY = 0))
-        driver.flush()
+        val previous = previousFrame
+        val ansi = if (previous == null || previous.size != strips.size) {
+            // First frame or terminal resized — full repaint.
+            StripSerializer.serialize(strips, originX = 0, originY = 0, clearFirst = previous == null)
+        } else {
+            StripSerializer.serializeDiff(previous, strips, originX = 0, originY = 0)
+        }
+        if (ansi.isNotEmpty()) {
+            driver.write(ansi)
+            driver.flush()
+        }
+        previousFrame = strips
     }
 
     /**
@@ -232,10 +258,8 @@ public abstract class App(
             is Resize -> {
                 screenWidth = event.columns
                 screenHeight = event.rows
-                // Resize compositor's viewport.
-                // The Compositor's viewport is val, so swap it via a fresh instance.
-                // (Phase 9.10 will make this in-place.)
-                // For now: best-effort — call placeAt afresh on the next renderFrame().
+                compositor.resize(Region(0, 0, screenWidth, screenHeight))
+                invalidate()
                 dirty = true
                 post(event)
                 currentScreen?.post(event)
@@ -248,6 +272,22 @@ public abstract class App(
                 }
                 // Find the topmost widget at the pointer; deliver directly.
                 val target = compositor.hitTest(x, y)
+                when (event) {
+                    is MouseMove -> updateHover(target)
+                    is Click -> {
+                        updateHover(target)
+                        // Click: briefly mark target as pressed so widgets can show a press visual.
+                        target?.let {
+                            it.isPressed = true
+                            rootScope.launch {
+                                delay(80)
+                                it.isPressed = false
+                                requestRefresh()
+                            }
+                        }
+                    }
+                    else -> {}
+                }
                 if (target != null) target.post(event)
                 else currentScreen?.post(event)
                 dirty = true
