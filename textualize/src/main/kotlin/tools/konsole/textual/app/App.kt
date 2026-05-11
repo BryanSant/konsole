@@ -369,7 +369,12 @@ public abstract class App(
      * Designed to be called from `fun main()`.
      */
     public open fun run() {
-        runBlocking(supervisor) {
+        // `runBlocking` is intentionally NOT a child of [supervisor]: the
+        // finally block cancels supervisor (and its children — pump coroutines,
+        // workers, etc.) and if runBlocking's own coroutine were a child of
+        // supervisor it would cancel itself mid-cleanup and surface a noisy
+        // JobCancellationException as runBlocking unwinds.
+        runBlocking {
             start()
             driver.startApplicationMode()
             try {
