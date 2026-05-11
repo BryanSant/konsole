@@ -1,11 +1,9 @@
 package tools.konsole.examples
 
-import kotlinx.coroutines.runBlocking
-import tools.konsole.rich.Console
 import tools.konsole.textual.app.App
 import tools.konsole.textual.binding.bindings
 import tools.konsole.textual.driver.HeadlessDriver
-import tools.konsole.textual.pilot.Pilot
+import tools.konsole.textual.driver.systemDriver
 import tools.konsole.textual.widget.Widget
 import tools.konsole.textual.widgets.Button
 import tools.konsole.textual.widgets.ButtonVariant
@@ -17,11 +15,13 @@ import tools.konsole.textual.widgets.Header
  * Four-function calculator. Buttons drive a state machine; the Digits
  * display reflects the current accumulator.
  *
- *   ./gradlew :examples:runExample -Pexample=CalculatorApp
+ *   ./demo.sh Calculator
  *
- * The bundled Pilot script computes `12 + 7 = 19` by clicking buttons.
+ * Type digits 0–9 to enter numbers, `+ - * / =` for operators, AC (or "c") to
+ * clear, and q to quit. Buttons are also clickable when running in a
+ * terminal with mouse support.
  */
-public class CalculatorApp : App(HeadlessDriver()) {
+public class CalculatorApp(headless: Boolean = false) : App(if (headless) HeadlessDriver() else systemDriver()) {
 
     private val display = Digits("0", id = "display")
 
@@ -43,11 +43,30 @@ public class CalculatorApp : App(HeadlessDriver()) {
 
     override val bindings = bindings(
         "q" to "quit",
+        "ctrl+c" to "quit",
         "c" to "clear",
-        "0" to "digit_0",
-        "+" to "plus",
-        "=" to "equals",
+        "0" to "digit_0", "1" to "digit_1", "2" to "digit_2", "3" to "digit_3", "4" to "digit_4",
+        "5" to "digit_5", "6" to "digit_6", "7" to "digit_7", "8" to "digit_8", "9" to "digit_9",
+        "+" to "plus", "-" to "minus", "*" to "mul", "/" to "div",
+        "=" to "equals", "enter" to "equals",
     )
+
+    @Suppress("unused") public fun action_clear() { clearAll() }
+    @Suppress("unused") public fun action_digit_0() = digit(0)
+    @Suppress("unused") public fun action_digit_1() = digit(1)
+    @Suppress("unused") public fun action_digit_2() = digit(2)
+    @Suppress("unused") public fun action_digit_3() = digit(3)
+    @Suppress("unused") public fun action_digit_4() = digit(4)
+    @Suppress("unused") public fun action_digit_5() = digit(5)
+    @Suppress("unused") public fun action_digit_6() = digit(6)
+    @Suppress("unused") public fun action_digit_7() = digit(7)
+    @Suppress("unused") public fun action_digit_8() = digit(8)
+    @Suppress("unused") public fun action_digit_9() = digit(9)
+    @Suppress("unused") public fun action_plus() = operator('+')
+    @Suppress("unused") public fun action_minus() = operator('-')
+    @Suppress("unused") public fun action_mul() = operator('*')
+    @Suppress("unused") public fun action_div() = operator('/')
+    @Suppress("unused") public fun action_equals() = equals()
 
     override fun compose(): Sequence<Widget> = sequenceOf(
         Header(title = "Calculator"),
@@ -121,26 +140,6 @@ public class CalculatorApp : App(HeadlessDriver()) {
     public val displayValue: String get() = display.value
 }
 
-public fun main(): Unit = runBlocking {
-    val app = CalculatorApp()
-    val pilot = Pilot(app)
-    pilot.use { p ->
-        p.pause(100)
-        app.renderFrame()
-
-        // Compute 12 + 7 = 19
-        @Suppress("UNCHECKED_CAST")
-        fun btn(id: String): Button = pilot.findOne("#$id") as? Button ?: error("missing #$id")
-        btn("d1").press(); p.pause(20)
-        btn("d2").press(); p.pause(20)
-        btn("op_plus").press(); p.pause(20)
-        btn("d7").press(); p.pause(20)
-        btn("op_eq").press(); p.pause(50)
-        app.renderFrame()
-    }
-
-    val console = Console.system()
-    console.print("[bold]Calculator demo finished.[/]")
-    console.print("Final display: [bold cyan]${app.displayValue}[/]")
-    console.print("[dim](expected: 19)[/]")
+public fun main() {
+    CalculatorApp().run()
 }
