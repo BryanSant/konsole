@@ -125,6 +125,22 @@ public class Progress(
         stop()
     }
 
+    /**
+     * Run [block] with the progress display started, stopping it on exit
+     * (including via exception). Shadows the stdlib `AutoCloseable.use`
+     * extension, which would otherwise only call `close()` and leave
+     * `start()` to the caller — every `advance` / `addTask` then becomes a
+     * no-op because Live's `refresh()` checks `if (!started) return`.
+     */
+    public inline fun <R> use(block: (Progress) -> R): R {
+        start()
+        try {
+            return block(this)
+        } finally {
+            stop()
+        }
+    }
+
     /** Convenience: track an iterable; auto-advances per element. */
     public fun <T> track(
         items: Iterable<T>,

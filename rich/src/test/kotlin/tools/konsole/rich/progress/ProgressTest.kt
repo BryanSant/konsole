@@ -57,4 +57,22 @@ class ProgressTest : StringSpec({
         p.update(id, total = 50.0, description = "new")
         p.task(id).total shouldBe 50.0
     }
+
+    "use { } starts the display so advance actually paints" {
+        // Regression for the LiveProgress demo: AutoCloseable.use only
+        // calls close()/stop(), so `progress.use { ... }` left the Live
+        // display un-started and `advance` became a no-op (Live.refresh
+        // bails when !started). Progress.use must start before the block
+        // and stop after.
+        val sw = StringWriter()
+        val c = Console(terminal = null, writer = sw, width = 80, colorSystem = ColorSystem.None)
+        val p = Progress(c, refreshPerSecond = 100.0)
+        p.use {
+            val id = it.addTask("alpha", total = 10.0)
+            it.advance(id, 5.0)
+        }
+        // Live drew at least the initial frame on start(); the rendered
+        // output must contain the task description.
+        sw.toString() shouldContain "alpha"
+    }
 })

@@ -112,6 +112,22 @@ public class Live(
         stop()
     }
 
+    /**
+     * Run [block] with the live display started, stopping it on exit
+     * (including via exception). Shadows the stdlib `AutoCloseable.use`
+     * extension so callers don't have to remember to call `start()`
+     * inside the block — without `start()` the display is never painted
+     * and every `refresh()` / `update()` becomes a no-op.
+     */
+    public inline fun <R> use(block: (Live) -> R): R {
+        start()
+        try {
+            return block(this)
+        } finally {
+            stop()
+        }
+    }
+
     /** Render the current renderable, overwriting the previous frame. */
     private fun drawFrame() {
         val renderable = current.get()
