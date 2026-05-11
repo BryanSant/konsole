@@ -103,21 +103,64 @@ public class Compositor(initialViewport: Region) {
     ) {
         val children = container.containerChildren
         if (children.isEmpty()) return
-        val pairs = children.map { child ->
+        // Resolve effective Styles for each child: container defaults overlaid
+        // by stylesheet rules (CSS wins, textual semantics).
+        val resolvedStyles = LinkedHashMap<tools.konsole.textual.widget.Widget, tools.konsole.textual.css.Styles>()
+        for (child in children) {
             val containerStyles = container.childStyles(child)
             val cssStyles = stylesheet?.apply(child) ?: tools.konsole.textual.css.Styles.NULL
-            // CSS overlays the container's own childStyles defaults — textual semantics.
-            child to (containerStyles + cssStyles)
+            resolvedStyles[child] = containerStyles + cssStyles
         }
+
+        // 1. Pull docked children out and pin them to viewport edges. Each
+        //    dock'd child shrinks the residual region; the remaining children
+        //    are laid out by the parent's Layout inside whatever's left.
+        var available = region
+        val nonDocked = mutableListOf<tools.konsole.textual.widget.Widget>()
+        for (child in children) {
+            val styles = resolvedStyles[child]!!
+            when (styles.dock) {
+                tools.konsole.textual.css.Dock.Top -> {
+                    val h = styles.height?.resolve(available.height, 1.0)?.coerceAtLeast(0) ?: 1
+                    val ch = h.coerceAtMost(available.height)
+                    placeAt(child, Region(available.x, available.y, available.width, ch), layer)
+                    available = Region(available.x, available.y + ch, available.width, (available.height - ch).coerceAtLeast(0))
+                }
+                tools.konsole.textual.css.Dock.Bottom -> {
+                    val h = styles.height?.resolve(available.height, 1.0)?.coerceAtLeast(0) ?: 1
+                    val ch = h.coerceAtMost(available.height)
+                    placeAt(child, Region(available.x, available.bottom - ch, available.width, ch), layer)
+                    available = Region(available.x, available.y, available.width, (available.height - ch).coerceAtLeast(0))
+                }
+                tools.konsole.textual.css.Dock.Left -> {
+                    val w = styles.width?.resolve(available.width, 1.0)?.coerceAtLeast(0) ?: 1
+                    val cw = w.coerceAtMost(available.width)
+                    placeAt(child, Region(available.x, available.y, cw, available.height), layer)
+                    available = Region(available.x + cw, available.y, (available.width - cw).coerceAtLeast(0), available.height)
+                }
+                tools.konsole.textual.css.Dock.Right -> {
+                    val w = styles.width?.resolve(available.width, 1.0)?.coerceAtLeast(0) ?: 1
+                    val cw = w.coerceAtMost(available.width)
+                    placeAt(child, Region(available.right - cw, available.y, cw, available.height), layer)
+                    available = Region(available.x, available.y, (available.width - cw).coerceAtLeast(0), available.height)
+                }
+                null -> nonDocked += child
+            }
+        }
+
+        // 2. Non-docked children go through the container's layout in the
+        //    residual region.
+        if (nonDocked.isEmpty()) return
+        val pairs = nonDocked.map { it to resolvedStyles[it]!! }
         val layout = tools.konsole.textual.layouts.Layout.forKind(container.layout)
         val placements = if (container.layout == tools.konsole.textual.css.LayoutKind.Grid) {
             tools.konsole.textual.layouts.GridLayout
-                .arrangeWithParent(region, pairs, container.containerStyles)
+                .arrangeWithParent(available, pairs, container.containerStyles)
         } else {
-            layout.arrange(region, pairs)
+            layout.arrange(available, pairs)
         }
         for (p in placements) {
-            placeAt(p.widget, p.region, layer)  // recurses into nested containers
+            placeAt(p.widget, p.region, layer)
         }
     }
 
