@@ -52,11 +52,34 @@ internal class EventReader(private val jline: JlineTerminal) {
     private var stopped: Boolean = false
 
     init {
-        // SIGWINCH → Resize event with new dimensions. jline polls Console API on Windows.
-        jline.handle(JlineTerminal.Signal.WINCH) { _ ->
-            val s = jline.size
-            // trySendBlocking would suspend; emit can't be called synchronously. Hop to the scope.
-            scope.launch { _events.emit(Event.Resize(s.columns, s.rows)) }
+        // SIGWINCH → Resize event. We register the handler directly via
+        // sun.misc.Signal rather than jline.handle(), because JLine 4.1.0's
+        // AbstractUnixSysTerminal blows up on Linux when initialising its
+        // signal table (it includes BSD-only SIGINFO, which neither the FFM
+        // nor sun.misc.Signal fallback can register; the null return value
+        // is then put into a ConcurrentHashMap which rejects it with NPE).
+        // We bypass the whole mechanism by passing nativeSignals(false) to
+        // TerminalBuilder and installing our own handler here.
+        //
+        // The reflective sun.misc.Signal access mirrors what JLine's own
+        // Signals fallback does on JVMs without a public Signal API.
+        try {
+            val sigClass = Class.forName("sun.misc.Signal")
+            val handlerInterface = Class.forName("sun.misc.SignalHandler")
+            val proxy = java.lang.reflect.Proxy.newProxyInstance(
+                handlerInterface.classLoader,
+                arrayOf(handlerInterface),
+            ) { _, method, _ ->
+                if (method.name == "handle") {
+                    val s = jline.size
+                    scope.launch { _events.emit(Event.Resize(s.columns, s.rows)) }
+                }
+                null
+            }
+            val signal = sigClass.getConstructor(String::class.java).newInstance("WINCH")
+            sigClass.getMethod("handle", sigClass, handlerInterface).invoke(null, signal, proxy)
+        } catch (_: Throwable) {
+            // Non-fatal: resize events won't fire, but the app still runs.
         }
 
         scope.launch {

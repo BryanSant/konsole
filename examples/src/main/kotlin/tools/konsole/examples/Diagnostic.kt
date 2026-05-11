@@ -73,4 +73,30 @@ public fun main() {
         println("build() threw (this reveals the real FFM failure cause):")
         e.printStackTrace()
     }
+    println()
+
+    println("=== nativeSignals(false) workaround for JLine SIGINFO bug ===")
+    try {
+        TerminalBuilder.builder().system(true).dumb(false).nativeSignals(false).build().use { t ->
+            println("class    = ${t.javaClass.name}")
+            println("type     = ${t.type}")
+            println("size     = ${t.size}")
+        }
+    } catch (e: Throwable) {
+        println("workaround build() also threw:")
+        e.printStackTrace()
+    }
+    println()
+
+    println("=== tools.konsole.core.Terminal.system() (uses the workaround) ===")
+    try {
+        tools.konsole.core.Terminal.system().use { konsoleTerm ->
+            println("class    = ${konsoleTerm.underlying.javaClass.name}")
+            println("type     = ${konsoleTerm.underlying.type}")
+            println("size     = ${konsoleTerm.underlying.size}")
+        }
+    } catch (e: Throwable) {
+        println("Terminal.system() threw:")
+        e.printStackTrace()
+    }
 }

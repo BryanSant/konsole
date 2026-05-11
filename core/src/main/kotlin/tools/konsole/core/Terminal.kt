@@ -160,8 +160,16 @@ public class Terminal internal constructor(
          */
         @JvmStatic
         public fun system(): Terminal {
+            // nativeSignals(false): JLine 4.1.0's AbstractUnixSysTerminal
+            // unconditionally registers every value of the Terminal.Signal
+            // enum, which includes INFO (BSD/macOS-only). On Linux the
+            // registration returns null and ConcurrentHashMap.put throws NPE,
+            // taking the whole terminal construction down. We don't need
+            // JLine-managed signal handling; we wire WINCH ourselves in
+            // EventReader. See JLine issue tracker for the upstream bug.
             val jline = TerminalBuilder.builder()
                 .system(true)
+                .nativeSignals(false)
                 .build()
             return Terminal(jline)
         }
