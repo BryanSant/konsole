@@ -398,7 +398,15 @@ public abstract class App(
                 supervisor.cancel()
             }
         }
-        if (exitProcessOnRun) kotlin.system.exitProcess(0)
+        if (exitProcessOnRun) {
+            // Runtime.halt instead of System.exit/exitProcess: shutdown hooks
+            // (notably JLine's) can themselves block on stdin in cooked mode
+            // after we've restored attributes, leaving the user stuck typing
+            // line-buffered input that nobody consumes. We've already restored
+            // termios and written the disable sequences, so there's nothing
+            // the shutdown hooks need to do that benefits the user.
+            Runtime.getRuntime().halt(0)
+        }
     }
 
     /**
