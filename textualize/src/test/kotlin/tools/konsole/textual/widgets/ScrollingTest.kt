@@ -42,8 +42,8 @@ class ScrollingTest : StringSpec({
         app.start()
         runBlocking {
             (app.driver as HeadlessDriver).send(Key(KeyCode.Down))
-            (app.driver as HeadlessDriver).send(Key(KeyCode.Down))
-            (app.driver as HeadlessDriver).send(Key(KeyCode.Down))
+            app.driver.send(Key(KeyCode.Down))
+            app.driver.send(Key(KeyCode.Down))
             delay(80)
         }
         log.scrollY shouldBe 3

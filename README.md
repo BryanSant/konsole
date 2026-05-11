@@ -4,8 +4,6 @@ A pure-Kotlin reimplementation of Python's [`rich`](https://github.com/Textualiz
 and [`textual`](https://github.com/Textualize/textual) libraries, built for the JVM
 with native terminal access via [JLine FFM](https://github.com/jline/jline3).
 
-> **Status:** Phase 0 — bootstrap. Not yet functional.
-
 ## Modules
 
 | Module               | Purpose                                                                |
@@ -13,9 +11,9 @@ with native terminal access via [JLine FFM](https://github.com/jline/jline3).
 | `:core`              | Terminal primitives — JLine wrapper, ANSI commands, input parser       |
 | `:rich`              | `rich` port — Console, Style, Text, renderables, Live, Progress, etc.  |
 | `:textualize`        | `textual` port — App, Screen, Widget, TCSS, built-in widgets           |
-
-(Published Maven artifacts keep the `konsole-` prefix: `konsole-core`, `konsole-rich`, `konsole-textual`.)
 | `:examples`          | Runnable demos                                                         |
+
+Published Maven artifacts keep the `konsole-` prefix: `konsole-core`, `konsole-rich`, `konsole-textual`.
 
 ## Stack
 
@@ -24,10 +22,24 @@ with native terminal access via [JLine FFM](https://github.com/jline/jline3).
 - kotlinx-coroutines 1.10.2, kotlinx-io 0.9.0
 - commonmark 0.24.0 (Markdown), Kotest 6.1.11 (tests)
 
-## Running an example
+Runs on Linux, macOS, and Windows Terminal 1.25+ (kitty keyboard protocol
+support is required; legacy `conhost` is not supported).
+
+## Running a demo
+
+The `demo.sh` script wraps the Gradle invocation with the right JVM args
+and lets you pick by short name:
 
 ```sh
-./gradlew :examples:runExample -Pexample=HelloKonsole
+./demo.sh              # list all demos
+./demo.sh Pride        # run PrideApp (suffix optional, case-insensitive)
+./demo.sh Calculator   # run CalculatorApp
+```
+
+Or directly:
+
+```sh
+./gradlew :examples:runExample -Pexample=PrideApp
 ```
 
 JLine FFM on Java 25 needs `--enable-native-access=ALL-UNNAMED`. The
@@ -38,6 +50,7 @@ consumers must pass it themselves.
 
 - `./gradlew build` — compile + test (excludes TTY-required tests)
 - `./gradlew :core:ttyTest` — opt-in real-terminal integration tests
+- `./gradlew test` — fast unit tests across all modules
 
 ## License
 

@@ -82,7 +82,7 @@ public fun main(): Unit = runBlocking {
         app.renderFrame()
 
         // Walk to README.md if present.
-        val readmeNode = app.tree.root.children.firstOrNull { (it.data as? File)?.name == "README.md" }
+        val readmeNode = app.tree.root.children.firstOrNull { it.data?.name == "README.md" }
         if (readmeNode != null) {
             // Highlight the README; the Tree.Highlighted message wires the preview.
             val idx = app.tree.root.children.indexOf(readmeNode) + 1  // +1 for root row

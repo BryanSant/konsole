@@ -30,7 +30,7 @@ class Phase910Test : StringSpec({
         (app.driver as HeadlessDriver).clearOutput()
         // Second frame: nothing changed. The diff should be empty.
         app.renderFrame()
-        (app.driver as HeadlessDriver).output shouldBe ""
+        app.driver.output shouldBe ""
     }
 
     "StripSerializer.serializeDiff skips matching rows and only emits changed ones" {
@@ -51,7 +51,7 @@ class Phase910Test : StringSpec({
         app.invalidate()
         app.renderFrame()
         // Output non-empty (full repaint after invalidate)
-        (app.driver as HeadlessDriver).output.isNotEmpty() shouldBe true
+        app.driver.output.isNotEmpty() shouldBe true
     }
 
     "Compositor.resize updates the viewport in place" {
@@ -105,7 +105,7 @@ class Phase910Test : StringSpec({
             (app.driver as HeadlessDriver).send(MouseMove(x = 0, y = 0))
             delay(40)
             btn.isHovered shouldBe true
-            (app.driver as HeadlessDriver).send(MouseMove(x = 0, y = 1))
+            app.driver.send(MouseMove(x = 0, y = 1))
             delay(40)
         }
         btn.isHovered shouldBe false

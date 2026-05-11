@@ -68,8 +68,8 @@ public class ProgressBar(
             return@sequence
         }
 
-        // After the shouldPulse early-return, total is guaranteed non-null.
-        val effectiveTotal = total!!
+        // After the shouldPulse early-return, total is guaranteed non-null (smart-cast from the `shouldPulse` check).
+        val effectiveTotal: Double = total
         val clampedCompleted = completed.coerceIn(0.0, effectiveTotal)
         val bar = if (ascii) "-" else "━"
         val halfBarRight = if (ascii) " " else "╸"

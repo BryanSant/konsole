@@ -358,7 +358,7 @@ internal object SegmentEmitter {
         }
         flushText()
         if (currentLink != null) out += EndLink
-        if (currentStyle != null && !currentStyle!!.isNull) out += ResetColor
+        if (currentStyle != null && !currentStyle.isNull) out += ResetColor
         return out
     }
 }

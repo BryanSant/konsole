@@ -30,14 +30,18 @@ fi
 
 NAME="$1"
 
-# Resolve case-insensitively, allow omitting the "App" suffix.
+# Resolve case-insensitively. Accept the bare name, or with common suffixes
+# ("App", "Demo") tacked on. Prefer exact match; fall back to prefix match.
 RESOLVED="$(list_demos | awk -v n="$NAME" '
-    BEGIN { IGNORECASE = 1 }
-    $0 == n          { print; exit }
-    $0 == n "App"    { print; exit }
-    tolower($0) == tolower(n)        { print; exit }
-    tolower($0) == tolower(n) "app"  { print; exit }
-' || true)"
+    function ic(a, b) { return tolower(a) == tolower(b) }
+    {
+        if (ic($0, n) || ic($0, n "App") || ic($0, n "Demo")) { print; exit }
+    }' || true)"
+
+# If still nothing, accept any case-insensitive prefix.
+if [ -z "$RESOLVED" ]; then
+    RESOLVED="$(list_demos | awk -v n="$NAME" 'tolower($0) ~ "^" tolower(n) { print; exit }' || true)"
+fi
 
 if [ -z "$RESOLVED" ]; then
     echo "No demo matching '$NAME'." >&2

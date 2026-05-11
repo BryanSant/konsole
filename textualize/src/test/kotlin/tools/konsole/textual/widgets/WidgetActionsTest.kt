@@ -107,7 +107,7 @@ class WidgetActionsTest : StringSpec({
         app.setFocus(input)
         runBlocking {
             (app.driver as HeadlessDriver).send(Key(KeyCode.Char('h')))
-            (app.driver as HeadlessDriver).send(Key(KeyCode.Char('i')))
+            app.driver.send(Key(KeyCode.Char('i')))
             delay(100)
         }
         input.value shouldBe "hi"
@@ -141,8 +141,8 @@ class WidgetActionsTest : StringSpec({
         app.setFocus(ta)
         runBlocking {
             (app.driver as HeadlessDriver).send(Key(KeyCode.Char('a')))
-            (app.driver as HeadlessDriver).send(Key(KeyCode.Enter))
-            (app.driver as HeadlessDriver).send(Key(KeyCode.Char('b')))
+            app.driver.send(Key(KeyCode.Enter))
+            app.driver.send(Key(KeyCode.Char('b')))
             delay(100)
         }
         ta.text shouldBe "a\nb"

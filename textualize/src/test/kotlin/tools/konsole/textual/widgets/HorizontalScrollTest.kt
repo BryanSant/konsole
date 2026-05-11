@@ -40,7 +40,7 @@ class HorizontalScrollTest : StringSpec({
         runBlocking {
             (app.driver as HeadlessDriver).send(Key(KeyCode.Right))
             delay(40)
-            (app.driver as HeadlessDriver).send(Key(KeyCode.Right))
+            app.driver.send(Key(KeyCode.Right))
             delay(40)
         }
         log.scrollX shouldBe 4

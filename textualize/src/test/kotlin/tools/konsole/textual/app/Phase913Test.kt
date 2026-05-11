@@ -71,7 +71,7 @@ class Phase913Test : StringSpec({
         runBlocking {
             (app.driver as HeadlessDriver).send(MouseDown(0, 0, MouseButton.Left))
             delay(30)
-            (app.driver as HeadlessDriver).send(MouseUp(0, 0, MouseButton.Left))
+            app.driver.send(MouseUp(0, 0, MouseButton.Left))
             delay(80)
         }
         clickReceived shouldBe true
@@ -95,7 +95,7 @@ class Phase913Test : StringSpec({
         runBlocking {
             (app.driver as HeadlessDriver).send(MouseDown(0, 0, MouseButton.Left))   // press a
             delay(20)
-            (app.driver as HeadlessDriver).send(MouseUp(0, 1, MouseButton.Left))      // release on b
+            app.driver.send(MouseUp(0, 1, MouseButton.Left))      // release on b
             delay(80)
         }
         clickA shouldBe false
@@ -114,7 +114,7 @@ class Phase913Test : StringSpec({
         runBlocking {
             (app.driver as HeadlessDriver).send(MouseDown(2, 0, MouseButton.Left))
             delay(20)
-            (app.driver as HeadlessDriver).send(tools.konsole.textual.events.MouseMove(10, 0))
+            app.driver.send(tools.konsole.textual.events.MouseMove(10, 0))
             delay(80)
         }
         lastDrag?.startX shouldBe 2
