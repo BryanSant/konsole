@@ -55,14 +55,32 @@ public open class Tree<T>(
     public fun currentNode(): Node<T>? = visibleNodes().getOrNull(cursorLine)
 
     public fun expandCurrent() {
-        currentNode()?.let { if (it.children.isNotEmpty()) { it.expanded = true; refresh() } }
+        currentNode()?.let {
+            if (it.children.isNotEmpty()) {
+                onBeforeExpand(it)
+                it.expanded = true
+                refresh()
+            }
+        }
     }
     public fun collapseCurrent() {
         currentNode()?.let { if (it.expanded) { it.expanded = false; refresh() } }
     }
     public fun toggleExpand() {
-        currentNode()?.let { it.expanded = !it.expanded; refresh() }
+        currentNode()?.let {
+            if (!it.expanded) onBeforeExpand(it)
+            it.expanded = !it.expanded
+            refresh()
+        }
     }
+
+    /**
+     * Hook fired just before a node transitions from collapsed to expanded.
+     * Subclasses (e.g. [DirectoryTree]) override to lazy-populate the node's
+     * children from an external source — replacing any placeholder children
+     * added at insert time. Default implementation does nothing.
+     */
+    protected open fun onBeforeExpand(node: Node<T>) {}
 
     public fun selectCurrent(): Boolean {
         val node = currentNode() ?: return false
@@ -133,6 +151,15 @@ public open class Tree<T>(
         }
 
         public fun add(label: String, data: T? = null): Node<T> = addLeaf(label, data)
+
+        /**
+         * Drop every child of this node. Used by lazy-populating subclasses
+         * (e.g. [DirectoryTree]) to swap a placeholder for the real listing
+         * on first expand.
+         */
+        public fun clearChildren() {
+            _children.clear()
+        }
     }
 
     public data class Highlighted<T>(val tree: Tree<T>, val node: Node<T>) : Message()

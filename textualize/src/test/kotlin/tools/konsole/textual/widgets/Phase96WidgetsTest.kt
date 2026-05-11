@@ -160,6 +160,29 @@ class Phase96WidgetsTest : StringSpec({
         tmp.deleteRecursively()
     }
 
+    "DirectoryTree lazy-populates a sub-directory on first expand" {
+        // Sub-directories should only carry an `…` placeholder until the
+        // user first expands them — that's what makes the arrow render
+        // without walking the whole tree at init. On first expand, the
+        // placeholder must be replaced with the real listing.
+        val tmp = java.io.File.createTempFile("konsole-dirtree-lazy-", "").apply {
+            delete()
+            mkdirs()
+            java.io.File(this, "sub").mkdirs()
+            java.io.File(this, "sub/nested.txt").writeText("n")
+        }
+        val dt = DirectoryTree(tmp.absolutePath)
+        val sub = dt.root.children.first { it.label == "sub/" }
+        // Stubbed before expand: a single placeholder child with null data.
+        (sub.children.size == 1 && sub.children[0].data == null) shouldBe true
+        // Move cursor to "sub/" (root is at 0, first child at 1) and expand.
+        dt.moveCursor(1)
+        dt.expandCurrent()
+        // Stub has been replaced by the real listing.
+        sub.children.map { it.label } shouldBe listOf("nested.txt")
+        tmp.deleteRecursively()
+    }
+
     "DirectoryTree with showHidden = false skips dotfiles" {
         val tmp = java.io.File.createTempFile("konsole-dirtree-hidden-", "").apply {
             delete()

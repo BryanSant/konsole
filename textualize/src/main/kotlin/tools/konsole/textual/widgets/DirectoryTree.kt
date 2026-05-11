@@ -24,6 +24,22 @@ public open class DirectoryTree(
         populate(root)
     }
 
+    /**
+     * Lazy-populate a directory node's children the first time it expands.
+     * `populate()` only seeds each directory with a single placeholder ("…")
+     * so the arrow renders without walking the whole tree up front; on first
+     * expand we replace that placeholder with the real listing.
+     */
+    override fun onBeforeExpand(node: Node<File>) {
+        val file = node.data ?: return
+        if (!file.isDirectory) return
+        val isStub = node.children.size == 1 && node.children[0].data == null
+        if (isStub) {
+            node.clearChildren()
+            populate(node)
+        }
+    }
+
     /** Re-scan the filesystem at this node and rebuild its children. */
     public fun reload(node: Node<File>) {
         // Clear and re-populate. Existing children are dropped via reflection-free reset:
