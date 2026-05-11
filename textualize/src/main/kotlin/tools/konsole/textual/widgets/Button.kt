@@ -29,10 +29,12 @@ public enum class ButtonVariant { Default, Primary, Success, Warning, Error }
 public open class Button(
     public val label: String = "",
     public val variant: ButtonVariant = ButtonVariant.Default,
-    public val disabled: Boolean = false,
+    disabled: Boolean = false,
     id: String? = null,
     classes: Set<String> = emptySet(),
 ) : Widget(id, classes) {
+
+    init { this.disabled = disabled }
 
     override val canFocus: Boolean get() = !disabled
 

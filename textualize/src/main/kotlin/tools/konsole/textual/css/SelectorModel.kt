@@ -30,18 +30,14 @@ public data class Selector(
         SelectorType.Universal -> Specificity(0, pseudoClasses.size, 0)
     }
 
-    public fun matches(node: DOMNode, focused: Boolean = false, hovered: Boolean = false, disabled: Boolean = false): Boolean {
+    public fun matches(node: DOMNode): Boolean {
         if (!matchesType(node)) return false
-        // All pseudo-classes (if any) must match.
-        for (p in pseudoClasses) {
-            val ok = when (p) {
-                "focus" -> focused
-                "hover" -> hovered
-                "disabled" -> disabled
-                "enabled" -> !disabled
-                else -> false  // unknown pseudo — treat as non-match (forward compatible)
+        // All pseudo-classes (if any) must be in the node's active set.
+        if (pseudoClasses.isNotEmpty()) {
+            val active = node.activePseudoClasses
+            for (p in pseudoClasses) {
+                if (p !in active) return false
             }
-            if (!ok) return false
         }
         return true
     }

@@ -46,6 +46,26 @@ public abstract class Widget(
         internal set
 
     /**
+     * Whether this widget is disabled — does not receive focus, does not
+     * fire bound actions on key/mouse events, and matches the `:disabled`
+     * CSS pseudo-class. Mirrors textual's `Widget.disabled`.
+     */
+    public var disabled: Boolean = false
+
+    /**
+     * Active CSS pseudo-classes for this widget, computed from interaction
+     * state every time the stylesheet is queried. Selectors like
+     * `Button:hover` re-match per frame against this set, so styles update
+     * as the user focuses / hovers / disables widgets.
+     */
+    override val activePseudoClasses: Set<String> get() = buildSet {
+        if (hasFocus) add("focus")
+        if (isHovered) add("hover")
+        if (isPressed) add("active")
+        if (disabled) add("disabled") else add("enabled")
+    }
+
+    /**
      * The screen-space region this widget was last placed at, set by the
      * [tools.konsole.textual.compositor.Compositor] during the most recent
      * render. `null` if the widget has never been placed.

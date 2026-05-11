@@ -1,6 +1,5 @@
 package tools.konsole.textual.css
 
-import tools.konsole.rich.LRUCache
 import tools.konsole.textual.dom.DOMNode
 
 /**
@@ -9,19 +8,15 @@ import tools.konsole.textual.dom.DOMNode
  * Call [apply] to compute the merged [Styles] for a [DOMNode] — rules with
  * higher specificity overlay lower ones, ties broken by declaration order.
  *
- * Match results are memoised per `(node-identity, rule-index)` via [LRUCache];
- * stylesheets are typically small (10s of rules) and nodes update infrequently.
+ * Pseudo-class state (`:hover`, `:focus`, `:disabled`, `:active`, `:enabled`)
+ * is read from [DOMNode.activePseudoClasses] on every call, so styles update
+ * as widget state changes without any cache invalidation.
  */
 public class Stylesheet(public val rules: List<RuleSet> = emptyList()) {
 
-    private val matchCache: LRUCache<Pair<Int, Int>, Boolean> = LRUCache(capacity = 1024)
-
     public fun apply(node: DOMNode): Styles {
         // Match every rule against node, sort by specificity, then overlay.
-        val matched = rules.withIndex().filter { (i, r) ->
-            val key = System.identityHashCode(node) to i
-            matchCache.getOrPut(key) { r.selectors.matches(node) }
-        }
+        val matched = rules.withIndex().filter { (_, r) -> r.selectors.matches(node) }
         val sorted = matched.sortedWith(compareBy({ it.value.specificity }, { it.index }))
         var styles = Styles.NULL
         for ((_, rule) in sorted) {

@@ -63,6 +63,14 @@ public abstract class DOMNode(
     /** CSS-selector-style name → matcher key. Override for synthetic types. */
     public open val cssType: String get() = this::class.simpleName ?: "DOMNode"
 
+    /**
+     * Pseudo-classes currently active on this node — used by selectors like
+     * `Button:hover` to re-match per frame. Widget subclasses derive this
+     * from their interaction state (focus, hover, press, disabled, …); the
+     * default base implementation is empty.
+     */
+    public open val activePseudoClasses: Set<String> get() = emptySet()
+
     override fun toString(): String =
         "${this::class.simpleName}(id=$id, classes=${classes.joinToString(",")})"
 }
