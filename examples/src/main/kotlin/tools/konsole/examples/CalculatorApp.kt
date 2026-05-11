@@ -1,72 +1,146 @@
 package tools.konsole.examples
 
-import tools.konsole.core.style.Color
+import kotlinx.coroutines.runBlocking
 import tools.konsole.rich.Console
-import tools.konsole.rich.Style
-import tools.konsole.rich.Text
-import tools.konsole.rich.box.Box
-import tools.konsole.rich.layout.Align
-import tools.konsole.rich.layout.Columns
-import tools.konsole.rich.layout.Group
-import tools.konsole.rich.layout.Padded
-import tools.konsole.rich.layout.Padding
-import tools.konsole.rich.panel.Panel
-import tools.konsole.rich.text.Justify
 import tools.konsole.textual.app.App
+import tools.konsole.textual.binding.bindings
 import tools.konsole.textual.driver.HeadlessDriver
+import tools.konsole.textual.pilot.Pilot
+import tools.konsole.textual.widget.Widget
 import tools.konsole.textual.widgets.Button
 import tools.konsole.textual.widgets.ButtonVariant
+import tools.konsole.textual.widgets.Digits
+import tools.konsole.textual.widgets.Footer
 import tools.konsole.textual.widgets.Header
-import tools.konsole.textual.widgets.Label
 
 /**
- * Phase 11 textual demo — the canonical Calculator app from the textual docs,
- * adapted to konsole's Phase 9 widget set.
+ * Four-function calculator. Buttons drive a state machine; the Digits
+ * display reflects the current accumulator.
  *
  *   ./gradlew :examples:runExample -Pexample=CalculatorApp
  *
- * The full live-update arithmetic engine arrives in Phase 9.5+; this demo
- * renders the static UI to show the layout works.
+ * The bundled Pilot script computes `12 + 7 = 19` by clicking buttons.
  */
 public class CalculatorApp : App(HeadlessDriver()) {
-    public val display: Label = Label("0", id = "display")
-    public val buttons: List<Button> = listOf(
-        Button("AC", variant = ButtonVariant.Error, id = "ac"),
-        Button("±", id = "negate"),
-        Button("%", id = "percent"),
-        Button("÷", variant = ButtonVariant.Warning, id = "divide"),
-        Button("7", id = "7"), Button("8", id = "8"), Button("9", id = "9"),
-        Button("×", variant = ButtonVariant.Warning, id = "multiply"),
-        Button("4", id = "4"), Button("5", id = "5"), Button("6", id = "6"),
-        Button("-", variant = ButtonVariant.Warning, id = "minus"),
-        Button("1", id = "1"), Button("2", id = "2"), Button("3", id = "3"),
-        Button("+", variant = ButtonVariant.Warning, id = "plus"),
-        Button("0", id = "0"), Button(".", id = "dot"),
-        Button("=", variant = ButtonVariant.Primary, id = "equals"),
+
+    private val display = Digits("0", id = "display")
+
+    // Calculator state
+    @Volatile private var current: String = "0"
+    @Volatile private var accumulator: Double = 0.0
+    @Volatile private var pendingOp: Char? = null
+    @Volatile private var freshEntry: Boolean = true
+
+    private val digits = (0..9).map { d ->
+        Button(d.toString(), id = "d$d")
+    }
+    private val opPlus = Button("+", variant = ButtonVariant.Warning, id = "op_plus")
+    private val opMinus = Button("-", variant = ButtonVariant.Warning, id = "op_minus")
+    private val opMul = Button("*", variant = ButtonVariant.Warning, id = "op_mul")
+    private val opDiv = Button("/", variant = ButtonVariant.Warning, id = "op_div")
+    private val opEquals = Button("=", variant = ButtonVariant.Primary, id = "op_eq")
+    private val opClear = Button("AC", variant = ButtonVariant.Error, id = "op_clear")
+
+    override val bindings = bindings(
+        "q" to "quit",
+        "c" to "clear",
+        "0" to "digit_0",
+        "+" to "plus",
+        "=" to "equals",
+    )
+
+    override fun compose(): Sequence<Widget> = sequenceOf(
+        Header(title = "Calculator"),
+        display,
+    ) + digits.asSequence() + sequenceOf(
+        opPlus, opMinus, opMul, opDiv, opEquals, opClear,
+        Footer(this.bindings),
     )
 
     init {
-        attach(Header(title = "Calculator"))
-        attach(display)
-        buttons.forEach { attach(it) }
+        for (b in digits) {
+            b.start()
+            val d = b.label.toInt()
+            b.onMessage<Button.Pressed> { digit(d) }
+        }
+        opPlus.start();  opPlus.onMessage<Button.Pressed>  { operator('+') }
+        opMinus.start(); opMinus.onMessage<Button.Pressed> { operator('-') }
+        opMul.start();   opMul.onMessage<Button.Pressed>   { operator('*') }
+        opDiv.start();   opDiv.onMessage<Button.Pressed>   { operator('/') }
+        opEquals.start(); opEquals.onMessage<Button.Pressed> { equals() }
+        opClear.start(); opClear.onMessage<Button.Pressed> { clearAll() }
     }
+
+    private fun digit(d: Int) {
+        current = if (freshEntry || current == "0") d.toString() else current + d.toString()
+        freshEntry = false
+        display.update(current)
+        requestRefresh()
+    }
+
+    private fun operator(op: Char) {
+        commitPending()
+        pendingOp = op
+        freshEntry = true
+    }
+
+    private fun equals() {
+        commitPending()
+        pendingOp = null
+        freshEntry = true
+        display.update(formatNumber(accumulator))
+        current = display.value
+        requestRefresh()
+    }
+
+    private fun commitPending() {
+        val n = current.toDoubleOrNull() ?: 0.0
+        accumulator = when (pendingOp) {
+            null -> n
+            '+' -> accumulator + n
+            '-' -> accumulator - n
+            '*' -> accumulator * n
+            '/' -> if (n == 0.0) Double.NaN else accumulator / n
+            else -> n
+        }
+    }
+
+    private fun clearAll() {
+        current = "0"
+        accumulator = 0.0
+        pendingOp = null
+        freshEntry = true
+        display.update("0")
+        requestRefresh()
+    }
+
+    private fun formatNumber(v: Double): String =
+        if (v == v.toLong().toDouble()) v.toLong().toString() else "%g".format(v)
+
+    /** Test-visible accessor for the current displayed value. */
+    public val displayValue: String get() = display.value
 }
 
-public fun main() {
-    val console = Console.system()
+public fun main(): Unit = runBlocking {
     val app = CalculatorApp()
+    val pilot = Pilot(app)
+    pilot.use { p ->
+        p.pause(100)
+        app.renderFrame()
 
-    val displayPanel = Panel(
-        renderable = Align(app.display.render(), align = Justify.Right, style = Style(bgcolor = Color.Black, color = Color.White, bold = true)),
-        title = Text("Calculator", style = Style(bold = true)),
-        box = Box.ROUNDED,
-        borderStyle = Style(color = Color.Cyan),
-    )
-    console.print(displayPanel)
-
-    // 4x5 button grid laid out as rows of Columns. The full grid layout lands in Phase 8.5.
-    val rows = app.buttons.chunked(4)
-    for (row in rows) {
-        console.print(Columns(row.map { btn -> Padded(btn.render(), Padding(0, 1, 0, 1)) }))
+        // Compute 12 + 7 = 19
+        @Suppress("UNCHECKED_CAST")
+        fun btn(id: String): Button = pilot.findOne("#$id") as? Button ?: error("missing #$id")
+        btn("d1").press(); p.pause(20)
+        btn("d2").press(); p.pause(20)
+        btn("op_plus").press(); p.pause(20)
+        btn("d7").press(); p.pause(20)
+        btn("op_eq").press(); p.pause(50)
+        app.renderFrame()
     }
+
+    val console = Console.system()
+    console.print("[bold]Calculator demo finished.[/]")
+    console.print("Final display: [bold cyan]${app.displayValue}[/]")
+    console.print("[dim](expected: 19)[/]")
 }

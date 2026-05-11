@@ -307,6 +307,11 @@ public abstract class App(
 
     /** Internal: a no-op screen wrapper around [App.compose] output for the default mount path. */
     private class DefaultScreen(private val widgets: List<Widget>) : Screen() {
+        init {
+            // Attach each composed widget to the screen so DOM queries (#id, .class)
+            // and Pilot.findOne can locate them.
+            for (w in widgets) attach(w)
+        }
         override fun compose(): Sequence<Widget> = widgets.asSequence()
     }
 }
