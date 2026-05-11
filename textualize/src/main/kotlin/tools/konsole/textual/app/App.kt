@@ -134,6 +134,52 @@ public abstract class App(
     /** Frame compositor. Re-sized on each [Resize] event. */
     public val compositor: Compositor = Compositor(Region(0, 0, screenWidth, screenHeight))
 
+    /**
+     * Active TCSS stylesheet. Default [tools.konsole.textual.css.Stylesheet]
+     * holds zero rules. Replace via [loadStylesheet] or assign directly;
+     * widgets see the new styles on the next render.
+     */
+    @Volatile public var stylesheet: tools.konsole.textual.css.Stylesheet = tools.konsole.textual.css.Stylesheet()
+
+    /** Load + replace the [stylesheet] from a `.tcss` file on disk. */
+    public fun loadStylesheet(file: java.io.File) {
+        stylesheet = tools.konsole.textual.css.Stylesheet.parse(file.readText(), file.name)
+        invalidate()
+        requestRefresh()
+    }
+
+    private var stylesheetWatcher: tools.konsole.textual.css.StylesheetWatcher? = null
+
+    /**
+     * Watch [file] for changes and hot-reload [stylesheet]. Mirrors textual's
+     * `--dev` CSS auto-reload. The next frame after each change picks up the
+     * new rules.
+     *
+     * Pair with [stopWatchingStylesheet] (or simply stop the app, which
+     * cancels every scope).
+     */
+    public fun watchStylesheet(file: java.io.File) {
+        stylesheetWatcher?.stop()
+        loadStylesheet(file)
+        val watcher = tools.konsole.textual.css.StylesheetWatcher(
+            file = file,
+            scope = rootScope,
+            onChange = { content: String ->
+                stylesheet = tools.konsole.textual.css.Stylesheet.parse(content, file.name)
+                invalidate()
+                requestRefresh()
+                kotlin.Unit  // disambiguate from textual.css.Unit (Scalar enum) in scope
+            },
+        )
+        watcher.start()
+        stylesheetWatcher = watcher
+    }
+
+    public fun stopWatchingStylesheet() {
+        stylesheetWatcher?.stop()
+        stylesheetWatcher = null
+    }
+
     /** Toasts queued to be rendered on the TOAST layer. */
     private val activeToasts: MutableList<Toast> = mutableListOf()
 

@@ -52,6 +52,14 @@ public object StripSerializer {
      * so consecutive identical strips are skipped entirely — typical
      * idle frames send zero bytes.
      */
+    /**
+     * Cell-level diff: walk row by row, find runs of changed cells within
+     * each row, emit only those cells with cursor positioning + SGR state.
+     *
+     * A cursor moving in a TextArea changes 2 cells per frame and emits
+     * ~14 bytes (positioning + 2 chars + positioning + 2 chars) instead
+     * of the row-level path's ~100+ bytes (full row of 80 cells).
+     */
     public fun serializeDiff(
         old: List<Strip>,
         new: List<Strip>,
@@ -63,9 +71,7 @@ public object StripSerializer {
         var wroteAny = false
         for (i in 0 until rows) {
             if (stripsEqual(old[i], new[i])) continue
-            sb.append(Ansi.CSI).append(originY + i + 1).append(';').append(originX + 1).append('H')
-            writeStrip(sb, new[i])
-            wroteAny = true
+            wroteAny = emitRowCellDiff(sb, old[i], new[i], originX, originY + i) || wroteAny
         }
         // Rows added beyond `old.size` (terminal grew) — emit them fresh.
         for (i in rows until new.size) {
@@ -75,6 +81,59 @@ public object StripSerializer {
         }
         if (wroteAny) sb.append(Ansi.CSI).append("0m")
         return sb.toString()
+    }
+
+    private fun emitRowCellDiff(
+        sb: StringBuilder,
+        old: Strip,
+        new: Strip,
+        originX: Int,
+        rowY: Int,
+    ): Boolean {
+        val oldCells = stripToCells(old)
+        val newCells = stripToCells(new)
+        val width = maxOf(oldCells.size, newCells.size)
+        var wrote = false
+        var i = 0
+        while (i < width) {
+            val oldCell = oldCells.getOrNull(i)
+            val newCell = newCells.getOrNull(i) ?: CellRep(' ', null)
+            if (oldCell == newCell) { i += 1; continue }
+            // Found start of a differing run — walk to the end.
+            val runStart = i
+            while (i < width) {
+                val o = oldCells.getOrNull(i)
+                val n = newCells.getOrNull(i) ?: CellRep(' ', null)
+                if (o == n) break
+                i += 1
+            }
+            // Emit positioning + cells [runStart, i).
+            sb.append(Ansi.CSI).append(rowY + 1).append(';').append(originX + runStart + 1).append('H')
+            var lastStyle: Style? = null
+            // Insert a CSI 0 m before the run since we don't know prior cursor state.
+            sb.append(Ansi.CSI).append("0m")
+            for (k in runStart until i) {
+                val cell = newCells.getOrNull(k) ?: CellRep(' ', null)
+                if (cell.style != lastStyle) {
+                    sb.append(Ansi.CSI).append("0m")
+                    if (cell.style != null && !cell.style.isNull) emitSgr(sb, cell.style)
+                    lastStyle = cell.style
+                }
+                sb.append(cell.ch)
+            }
+            wrote = true
+        }
+        return wrote
+    }
+
+    private data class CellRep(val ch: Char, val style: Style?)
+
+    private fun stripToCells(strip: Strip): List<CellRep> {
+        val out = ArrayList<CellRep>(strip.cellLength)
+        for (seg in strip.segments) {
+            for (ch in seg.text) out += CellRep(ch, seg.style)
+        }
+        return out
     }
 
     private fun stripsEqual(a: Strip, b: Strip): Boolean {
