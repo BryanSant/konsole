@@ -24,11 +24,27 @@ import tools.konsole.textual.widget.Widget
  *   markup or a [Renderable].
  */
 public open class OptionList(
-    public val options: List<Pair<String, Renderable>>,
+    options: List<Pair<String, Renderable>>,
     initialIndex: Int = 0,
     id: String? = null,
     classes: Set<String> = emptySet(),
 ) : Widget(id, classes) {
+
+    /** Current options. Replace via [setOptions] / [setLabels]. */
+    public var options: List<Pair<String, Renderable>> = options
+        private set
+
+    /** Replace the options shown. Resets the highlight to the first item. */
+    public fun setOptions(newOptions: List<Pair<String, Renderable>>) {
+        options = newOptions
+        highlightedIndex = if (newOptions.isEmpty()) 0 else 0
+        refresh()
+    }
+
+    /** Convenience: replace options from a list of label strings (markup-parsed). */
+    public fun setLabels(labels: List<String>) {
+        setOptions(labels.map { it to Markup.parse(it) })
+    }
 
     public companion object {
         /**
