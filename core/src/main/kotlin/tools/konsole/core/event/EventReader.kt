@@ -4,7 +4,9 @@ import tools.konsole.core.Position
 import tools.konsole.core.event.AnsiInputParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.BufferOverflow
@@ -29,7 +31,20 @@ import org.jline.terminal.Terminal as JlineTerminal
  */
 internal class EventReader(private val jline: JlineTerminal) {
 
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob() + Job())
+    // Daemon dispatcher: jline.reader().read() is a blocking native call that
+    // Kotlin can't interrupt via coroutine cancellation. If this thread were
+    // non-daemon, the JVM would refuse to exit on App shutdown until the user
+    // pressed a key to release the read. Daemon threads don't block exit, so
+    // the process terminates as soon as runBlocking returns even with read()
+    // still in flight.
+    private val readerDispatcher: ExecutorCoroutineDispatcher =
+        java.util.concurrent.Executors
+            .newSingleThreadExecutor { r ->
+                Thread(r, "konsole-event-reader").apply { isDaemon = true }
+            }
+            .asCoroutineDispatcher()
+
+    private val scope: CoroutineScope = CoroutineScope(readerDispatcher + SupervisorJob() + Job())
 
     private val _events = MutableSharedFlow<Event>(
         replay = 0,
