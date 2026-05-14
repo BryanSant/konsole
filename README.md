@@ -1,3 +1,5 @@
+<img width="1800" height="600" alt="konsole" src="https://github.com/user-attachments/assets/9e183c2b-d9a6-4059-8147-a788a412412c" />
+
 # konsole
 
 A pure-Kotlin reimplementation of Python's [`rich`](https://github.com/Textualize/rich)
