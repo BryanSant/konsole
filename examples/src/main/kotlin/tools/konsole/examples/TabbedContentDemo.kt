@@ -29,8 +29,8 @@ public class TabbedContentDemo(headless: Boolean = false) : App(if (headless) He
         panes = listOf(
             TabPane("overview", "Overview", listOf(
                 Label("[bold cyan]Konsole[/]"),
-                Label("Pure-Kotlin port of rich + textual on JLine FFM."),
-                Label("Runs on Linux, macOS, Windows Terminal 1.25+."),
+                Label("Pure-Kotlin port of rich + textual on direct FFM termios."),
+                Label("Runs on Linux and macOS today; Windows driver TBD."),
             )),
             TabPane("stats", "Stats", listOf(
                 Label("[bold]Modules:[/] core · rich · textualize · examples"),

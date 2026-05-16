@@ -4,13 +4,13 @@
 
 A pure-Kotlin reimplementation of Python's [`rich`](https://github.com/Textualize/rich)
 and [`textual`](https://github.com/Textualize/textual) libraries, built for the JVM
-with native terminal access via [JLine FFM](https://github.com/jline/jline3).
+with direct FFM bindings to termios / ioctl — no JLine, no JNI.
 
 ## Modules
 
 | Module               | Purpose                                                                |
 |----------------------|------------------------------------------------------------------------|
-| `:core`              | Terminal primitives — JLine wrapper, ANSI commands, input parser       |
+| `:core`              | Terminal primitives — FFM-direct TTY, ANSI commands, input parser      |
 | `:rich`              | `rich` port — Console, Style, Text, renderables, Live, Progress, etc.  |
 | `:textualize`        | `textual` port — App, Screen, Widget, TCSS, built-in widgets           |
 | `:examples`          | Runnable demos                                                         |
@@ -20,12 +20,14 @@ Published Maven artifacts keep the `konsole-` prefix: `konsole-core`, `konsole-r
 ## Stack
 
 - Gradle 9.5.0, Kotlin 2.3.21, Java 25 toolchain
-- JLine 4.1.0 (`jline-terminal` + `jline-terminal-ffm`)
 - kotlinx-coroutines 1.10.2, kotlinx-io 0.9.0
 - commonmark 0.24.0 (Markdown), Kotest 6.1.11 (tests)
 
-Runs on Linux, macOS, and Windows Terminal 1.25+ (kitty keyboard protocol
-support is required; legacy `conhost` is not supported).
+Runs on Linux and macOS today. Terminals that implement the kitty keyboard
+protocol (e.g. kitty, Ghostty, WezTerm, Alacritty, recent iTerm2) get the
+full input model; legacy CSI keys still work elsewhere. A Windows driver is
+on the roadmap but not implemented yet — on Windows the runtime falls back
+to konsole's dumb TTY (no raw mode, no input events).
 
 ## Running a demo
 
@@ -44,8 +46,8 @@ Or directly:
 ./gradlew :examples:runExample -Pexample=PrideApp
 ```
 
-JLine FFM on Java 25 needs `--enable-native-access=ALL-UNNAMED`. The
-`runExample` task and all `test` tasks set this automatically; downstream
+Konsole's libc bindings on Java 25 need `--enable-native-access=ALL-UNNAMED`.
+The `runExample` task and all `test` tasks set this automatically; downstream
 consumers must pass it themselves.
 
 ## Development

@@ -4,7 +4,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -13,10 +12,10 @@ import kotlinx.coroutines.flow.onEach
 import tools.konsole.core.InputMode
 import tools.konsole.core.Terminal
 import tools.konsole.core.event.Event as CoreEvent
-import tools.konsole.core.event.KeyEvent
 import tools.konsole.core.Hide as HideCursor
 import tools.konsole.core.terminal.EnterAlternateScreen
 import tools.konsole.core.terminal.LeaveAlternateScreen
+import tools.konsole.core.tty.RawModeHandle
 import tools.konsole.textual.events.AppBlur
 import tools.konsole.textual.events.AppFocus
 import tools.konsole.textual.events.Click
@@ -27,11 +26,10 @@ import tools.konsole.textual.events.Paste
 import tools.konsole.textual.events.Resize
 
 /**
- * Real-terminal driver backed by [tools.konsole.core.Terminal] (JLine FFM).
- * Mirrors Python textual's `LinuxDriver` but the implementation is platform-
- * agnostic: JLine's FFM provider abstracts raw mode, SIGWINCH (Console API on
- * Windows), and the byte streams. Works on Linux, macOS, and Windows Terminal
- * 1.25+ (which supports the kitty keyboard protocol). Web driver is v2.
+ * Real-terminal driver backed by [tools.konsole.core.Terminal]. Mirrors Python
+ * textual's `LinuxDriver`; the underlying [tools.konsole.core.tty.Tty]
+ * abstracts raw mode, sizing, and the byte streams across Linux and macOS
+ * today. Windows driver is planned but not yet implemented.
  *
  * On [startApplicationMode]:
  *  1. enter raw mode
@@ -52,17 +50,14 @@ public class TerminalDriver(
     override val events: SharedFlow<TextualEvent> get() = eventFlow.asSharedFlow()
 
     private var started: Boolean = false
-    private var rawSaved: org.jline.terminal.Attributes? = null
+    private var rawHandle: RawModeHandle? = null
     private val ioScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
     private var pumpJob: Job? = null
 
     override fun startApplicationMode() {
         if (started) return
         started = true
-        rawSaved = terminal.underlying.enterRawMode()
-        // JLine's enterRawMode leaves VMIN=0/VTIME=1, which makes FileInputStream
-        // return -1 (EOF) after the 100ms timeout. Override to block on reads.
-        Terminal.fixupBlockingRawMode(terminal.underlying)
+        rawHandle = terminal.tty.enterRawMode()
         val sb0 = StringBuilder()
         EnterAlternateScreen.writeAnsi(sb0)
         HideCursor.writeAnsi(sb0)   // hide cursor for the duration of the App
@@ -91,14 +86,11 @@ public class TerminalDriver(
         LeaveAlternateScreen.writeAnsi(sb)
         terminal.out.append(sb)
         terminal.out.flush()
-        // We don't drain pending input here on purpose. NonBlockingInputStream
-        // is synchronized, and the EventReader pump is parked inside a blocking
-        // read on the same instance; a drain on the main thread would deadlock
-        // behind the pump's lock until the user pressed a key. With
-        // graphemeCluster(false) on the builder we no longer emit query
-        // sequences whose late responses could leak to the shell, so the drain
-        // isn't needed.
-        rawSaved?.let { terminal.underlying.attributes = it }
+        // We don't drain pending input here on purpose. EventReader's pump is
+        // parked inside a blocking tty.read(); a drain on the main thread
+        // would race with it. Restoring termios via the handle is enough.
+        rawHandle?.close()
+        rawHandle = null
         started = false
     }
 

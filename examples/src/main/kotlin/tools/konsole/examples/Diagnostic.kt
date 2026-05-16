@@ -1,8 +1,7 @@
 package tools.konsole.examples
 
-import org.jline.terminal.TerminalBuilder
-import org.jline.terminal.spi.SystemStream
-import org.jline.terminal.spi.TerminalProvider
+import tools.konsole.core.Terminal
+import tools.konsole.core.tty.Stream
 
 /**
  * Dump everything we know about the JVM/terminal connection. When a demo
@@ -10,8 +9,8 @@ import org.jline.terminal.spi.TerminalProvider
  * and copy the output — it tells us whether the problem is:
  *
  *  - the JVM not seeing a TTY at all (System.console() == null)
- *  - JLine FFM declining to attach (isSystemStream == false)
- *  - JLine attaching but the kernel returning a 0×0 size
+ *  - konsole's UnixTty declining to attach (isatty returns 0)
+ *  - the kernel returning a 0×0 size from TIOCGWINSZ
  *  - missing $TERM / wrong locale
  *
  *   ./demo.sh Diagnostic
@@ -31,69 +30,14 @@ public fun main() {
     }
     println()
 
-    println("=== JLine FFM provider ===")
+    println("=== tools.konsole.core.Terminal.system() ===")
     try {
-        val cls = Class.forName("org.jline.terminal.impl.ffm.FfmTerminalProvider")
-        val provider = cls.getDeclaredConstructor().newInstance() as TerminalProvider
-        println("provider loaded: $provider")
-        for (s in listOf(SystemStream.Input, SystemStream.Output, SystemStream.Error)) {
-            val sys = try { provider.isSystemStream(s) } catch (e: Throwable) { "threw: $e" }
-            val width = try { provider.systemStreamWidth(s) } catch (e: Throwable) { "threw: $e" }
-            val name = try { provider.systemStreamName(s) } catch (e: Throwable) { "threw: $e" }
-            println("  $s isSystem=$sys width=$width name=$name")
-        }
-    } catch (e: Throwable) {
-        println("FFM provider failed to load:")
-        e.printStackTrace()
-    }
-    println()
-
-    println("=== TerminalBuilder.system(true).build() ===")
-    try {
-        TerminalBuilder.builder().system(true).build().use { t ->
-            println("class    = ${t.javaClass.name}")
-            println("type     = ${t.type}")
-            println("size     = ${t.size}")
-            println("encoding = ${t.encoding()}")
-        }
-    } catch (e: Throwable) {
-        println("build() threw:")
-        e.printStackTrace()
-    }
-    println()
-
-    println("=== TerminalBuilder.dumb(false).build() (forces FFM, throws on fallback) ===")
-    try {
-        TerminalBuilder.builder().system(true).dumb(false).build().use { t ->
-            println("class    = ${t.javaClass.name}")
-            println("type     = ${t.type}")
-            println("size     = ${t.size}")
-        }
-    } catch (e: Throwable) {
-        println("build() threw (this reveals the real FFM failure cause):")
-        e.printStackTrace()
-    }
-    println()
-
-    println("=== nativeSignals(false) workaround for JLine SIGINFO bug ===")
-    try {
-        TerminalBuilder.builder().system(true).dumb(false).nativeSignals(false).build().use { t ->
-            println("class    = ${t.javaClass.name}")
-            println("type     = ${t.type}")
-            println("size     = ${t.size}")
-        }
-    } catch (e: Throwable) {
-        println("workaround build() also threw:")
-        e.printStackTrace()
-    }
-    println()
-
-    println("=== tools.konsole.core.Terminal.system() (uses the workaround) ===")
-    try {
-        tools.konsole.core.Terminal.system().use { konsoleTerm ->
-            println("class    = ${konsoleTerm.underlying.javaClass.name}")
-            println("type     = ${konsoleTerm.underlying.type}")
-            println("size     = ${konsoleTerm.underlying.size}")
+        Terminal.system().use { t ->
+            println("tty impl          = ${t.tty.typeLabel}")
+            println("size              = ${t.size.columns} cols x ${t.size.rows} rows")
+            println("isatty(stdin)     = ${t.tty.isatty(Stream.Input)}")
+            println("isatty(stdout)    = ${t.tty.isatty(Stream.Output)}")
+            println("isatty(stderr)    = ${t.tty.isatty(Stream.Error)}")
         }
     } catch (e: Throwable) {
         println("Terminal.system() threw:")

@@ -35,10 +35,10 @@ public fun main() {
         "textual",
         Style(color = Color.Magenta, underline = true, link = "https://textual.textualize.io"),
     )
-    t.append(", and this is the ", Style(dim = true))
+    t.append(", and this is ", Style(dim = true))
     t.append(
-        "JLine project",
-        Style(color = Color.Green, underline = true, link = "https://github.com/jline/jline3"),
+        "konsole",
+        Style(color = Color.Green, underline = true, link = "https://github.com/bryansant/konsole"),
     )
     t.append(".", Style(dim = true))
     console.print(t)

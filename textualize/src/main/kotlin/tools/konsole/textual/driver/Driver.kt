@@ -51,7 +51,7 @@ public interface Driver {
 }
 
 /**
- * Build a [TerminalDriver] bound to the process's controlling terminal via JLine FFM.
+ * Build a [TerminalDriver] bound to the process's controlling terminal.
  * Use this as the [tools.konsole.textual.app.App] driver when running interactively.
  *
  * ```

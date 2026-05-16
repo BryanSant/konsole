@@ -30,8 +30,6 @@ kotlin {
 dependencies {
     api(libs.kotlinx.coroutines.core)
     api(libs.kotlinx.io.core)
-    api(libs.jline.terminal)
-    runtimeOnly(libs.jline.terminal.ffm)
 
     testImplementation(libs.kotest.runner.junit5)
     testImplementation(libs.kotest.property)
@@ -70,7 +68,7 @@ publishing {
             artifactId = "konsole-core"
             pom {
                 name.set("konsole-core")
-                description.set("Konsole core terminal primitives — JLine FFM wrapper, ANSI commands, input parser.")
+                description.set("Konsole core terminal primitives — FFM-direct termios bindings, ANSI commands, input parser.")
                 url.set("https://github.com/bryansant/konsole")
                 licenses {
                     license {

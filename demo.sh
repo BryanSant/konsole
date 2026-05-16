@@ -7,9 +7,9 @@
 #
 # Why this script exists instead of `./gradlew :examples:runExample`:
 # Gradle's JavaExec task captures stdin/stdout and does not pass the
-# controlling terminal through to the child JVM. JLine FFM then reports
-# `dumb` terminal type and size 0x0, breaking every interactive demo.
-# This launcher uses Gradle only to compile + assemble the classpath, then
+# controlling terminal through to the child JVM. Konsole then sees a non-TTY,
+# falls back to its dumb impl, and every interactive demo breaks. This
+# launcher uses Gradle only to compile + assemble the classpath, then
 # `exec java` directly so the JVM inherits the calling shell's TTY.
 
 set -euo pipefail
@@ -81,10 +81,9 @@ if [ ! -x "$JAVA_BIN" ]; then
 fi
 
 # Exec into java directly so the JVM inherits the calling shell's TTY.
-# Using the toolchain JDK (Java 25) — JLine FFM requires Java 22+ and any
-# older `java` on the user's PATH would fall back to a dumb terminal.
+# Using the toolchain JDK (Java 25) — konsole's FFM bindings require Java 22+
+# and any older `java` on the user's PATH would fail to link libc symbols.
 exec "$JAVA_BIN" \
     --enable-native-access=ALL-UNNAMED \
-    -Dorg.jline.terminal.provider=ffm \
     -cp "$CLASSPATH" \
     "$MAIN_CLASS"

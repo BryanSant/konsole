@@ -36,7 +36,6 @@ tasks.register<JavaExec>("runExample") {
     })
     jvmArgs(
         "--enable-native-access=ALL-UNNAMED",
-        "-Dorg.jline.terminal.provider=ffm",
     )
     standardInput = System.`in`
 }

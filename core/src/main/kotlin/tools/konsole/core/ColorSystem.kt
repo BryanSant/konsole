@@ -38,8 +38,8 @@ public enum class ColorSystem {
          * Detect the best [ColorSystem] for the running process.
          *
          * @param isTty whether stdout is connected to a TTY. Caller is responsible
-         *   for determining this — typically `terminal.type != "dumb"` for a JLine
-         *   terminal, or `System.console() != null` as a fallback.
+         *   for determining this — typically `terminal.tty.isatty(Stream.Output)`,
+         *   or `System.console() != null` as a fallback.
          */
         public fun detect(isTty: Boolean): ColorSystem {
             val noColor = System.getenv("NO_COLOR")

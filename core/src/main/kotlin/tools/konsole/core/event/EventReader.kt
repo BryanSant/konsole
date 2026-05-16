@@ -1,7 +1,7 @@
 package tools.konsole.core.event
 
 import tools.konsole.core.Position
-import tools.konsole.core.event.AnsiInputParser
+import tools.konsole.core.tty.Tty
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
@@ -15,11 +15,10 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
-import org.jline.terminal.Terminal as JlineTerminal
 
 /**
- * Reads bytes from a jline terminal, feeds them to an [AnsiInputParser], and
- * publishes parsed events to a [SharedFlow].
+ * Reads bytes from a [Tty], feeds them to an [AnsiInputParser], and publishes
+ * parsed events to a [SharedFlow].
  *
  * One dedicated coroutine on [Dispatchers.IO] runs the blocking read loop. A
  * SIGWINCH handler emits resize events. Cursor-position queries route through
@@ -27,12 +26,12 @@ import org.jline.terminal.Terminal as JlineTerminal
  * key happens to be next in the stream.
  *
  * Lifetime is bound to the owning [tools.konsole.core.Terminal]; calling
- * [shutdown] cancels the read coroutine and unblocks the jline reader.
+ * [shutdown] cancels the read coroutine and unblocks the reader.
  */
-internal class EventReader(private val jline: JlineTerminal) {
+internal class EventReader(private val tty: Tty) {
 
-    // Daemon dispatcher: jline.reader().read() is a blocking native call that
-    // Kotlin can't interrupt via coroutine cancellation. If this thread were
+    // Daemon dispatcher: tty.read() is a blocking native call that Kotlin
+    // can't interrupt via coroutine cancellation. If this thread were
     // non-daemon, the JVM would refuse to exit on App shutdown until the user
     // pressed a key to release the read. Daemon threads don't block exit, so
     // the process terminates as soon as runBlocking returns even with read()
@@ -67,17 +66,10 @@ internal class EventReader(private val jline: JlineTerminal) {
     private var stopped: Boolean = false
 
     init {
-        // SIGWINCH → Resize event. We register the handler directly via
-        // sun.misc.Signal rather than jline.handle(), because JLine 4.1.0's
-        // AbstractUnixSysTerminal blows up on Linux when initialising its
-        // signal table (it includes BSD-only SIGINFO, which neither the FFM
-        // nor sun.misc.Signal fallback can register; the null return value
-        // is then put into a ConcurrentHashMap which rejects it with NPE).
-        // We bypass the whole mechanism by passing nativeSignals(false) to
-        // TerminalBuilder and installing our own handler here.
-        //
-        // The reflective sun.misc.Signal access mirrors what JLine's own
-        // Signals fallback does on JVMs without a public Signal API.
+        // SIGWINCH → Resize event. Registered reflectively against
+        // sun.misc.Signal because the JVM has no public Signal API. We do
+        // this here rather than in the Tty because SIGWINCH is process-global
+        // and the event channel lives here.
         try {
             val sigClass = Class.forName("sun.misc.Signal")
             val handlerInterface = Class.forName("sun.misc.SignalHandler")
@@ -86,7 +78,7 @@ internal class EventReader(private val jline: JlineTerminal) {
                 arrayOf(handlerInterface),
             ) { _, method, _ ->
                 if (method.name == "handle") {
-                    val s = jline.size
+                    val s = tty.size()
                     scope.launch { _events.emit(Event.Resize(s.columns, s.rows)) }
                 }
                 null
@@ -98,17 +90,10 @@ internal class EventReader(private val jline: JlineTerminal) {
         }
 
         scope.launch {
-            val reader = jline.reader()
             try {
                 while (!stopped) {
-                    val b: Int = try {
-                        reader.read()       // blocks; returns -1 on EOF, throws InterruptedIOException on shutdown
-                    } catch (_: InterruptedException) {
-                        break
-                    } catch (_: java.io.InterruptedIOException) {
-                        break
-                    }
-                    if (b == EOF) break
+                    val b: Int = tty.read()
+                    if (b == Tty.EOF) break
                     var ev = parser.advance(b)
                     // If the parser needs more bytes (lone Esc, partial CSI),
                     // give the kernel buffer a brief window to deliver them.
@@ -118,19 +103,13 @@ internal class EventReader(private val jline: JlineTerminal) {
                     // *next* keypress. Without this, pressing Esc once does
                     // nothing and pressing it twice fires the first Esc.
                     while (ev == null && !stopped) {
-                        val next: Int = try {
-                            reader.read(ESC_TIMEOUT_MS)
-                        } catch (_: InterruptedException) {
-                            break
-                        } catch (_: java.io.InterruptedIOException) {
-                            break
-                        }
+                        val next: Int = tty.read(ESC_TIMEOUT_MS)
                         when (next) {
-                            READ_EXPIRED -> {
+                            Tty.READ_EXPIRED -> {
                                 ev = parser.flush()
                                 break
                             }
-                            EOF -> {
+                            Tty.EOF -> {
                                 stopped = true
                                 break
                             }
@@ -146,10 +125,6 @@ internal class EventReader(private val jline: JlineTerminal) {
     }
 
     private companion object {
-        // JLine NonBlockingReader sentinels.
-        private const val EOF: Int = -1
-        private const val READ_EXPIRED: Int = -2
-
         // How long to wait for follow-up bytes after the parser signals it
         // needs more. 40 ms is comfortably above LAN/SSH latency for a single
         // CSI sequence's worth of bytes while still feeling instant for a
@@ -159,9 +134,7 @@ internal class EventReader(private val jline: JlineTerminal) {
 
     fun shutdown() {
         stopped = true
-        try {
-            jline.reader().shutdown()
-        } catch (_: Throwable) { /* ignore */ }
+        try { tty.shutdown() } catch (_: Throwable) { /* ignore */ }
         scope.cancel()
     }
 }

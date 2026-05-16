@@ -9,12 +9,13 @@ import tools.konsole.core.terminal.EndSynchronizedUpdate
 import tools.konsole.core.terminal.EnterAlternateScreen
 import tools.konsole.core.terminal.LeaveAlternateScreen
 import tools.konsole.core.terminal.Size
+import tools.konsole.core.tty.RawModeHandle
+import tools.konsole.core.tty.Tty
+import tools.konsole.core.tty.TtyFactory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
-import org.jline.terminal.Attributes
-import org.jline.terminal.TerminalBuilder
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.Writer
@@ -22,9 +23,9 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Krossterm's primary entry point. Wraps a jline `Terminal`, exposing a
- * Kotlin-idiomatic API for cursor movement, styling, raw mode, alternate
- * screen, and event reading.
+ * Konsole's primary entry point. Wraps a [Tty], exposing a Kotlin-idiomatic
+ * API for cursor movement, styling, raw mode, alternate screen, and event
+ * reading.
  *
  * Resource lifetime is managed via [AutoCloseable]: prefer Kotlin's `use { }`
  * to guarantee clean teardown.
@@ -37,29 +38,23 @@ import kotlin.time.Duration.Companion.milliseconds
  * }
  * ```
  *
- * The underlying jline terminal is reachable via [underlying] for power users
- * needing capability strings, terminfo, or signal hooks not yet exposed here.
+ * Power users needing low-level access (raw bytes, isatty per-stream, custom
+ * protocol negotiation) can reach the [Tty] directly via [tty].
  */
 public class Terminal internal constructor(
-    private val jline: org.jline.terminal.Terminal,
+    /** Direct access to the underlying [Tty]. */
+    public val tty: Tty,
 ) : AutoCloseable {
 
     /** The terminal's output writer. Pass to [execute] / [queue] / `terminal { }`. */
-    public val out: Writer get() = jline.writer()
-
-    /** Escape hatch — direct access to the underlying jline terminal. */
-    public val underlying: org.jline.terminal.Terminal get() = jline
+    public val out: Writer get() = tty.out
 
     /** Current terminal dimensions in cells. */
-    public val size: Size
-        get() {
-            val s = jline.size
-            return Size(s.columns, s.rows)
-        }
+    public val size: Size get() = tty.size()
 
-    private val eventReader: EventReader by lazy { EventReader(jline) }
+    private val eventReader: EventReader by lazy { EventReader(tty) }
 
-    private var rawAttributesSaved: Attributes? = null
+    private var rawModeHandle: RawModeHandle? = null
 
     /**
      * Switch into raw mode (no echo, no line buffering, no signal generation
@@ -67,26 +62,25 @@ public class Terminal internal constructor(
      * are restored on any exit, including via exception.
      */
     public inline fun <T> rawMode(block: () -> T): T {
-        val saved = enterRawModeInternal()
+        val handle = enterRawModeInternal()
         try {
             return block()
         } finally {
-            exitRawModeInternal(saved)
+            exitRawModeInternal(handle)
         }
     }
 
     @PublishedApi
-    internal fun enterRawModeInternal(): Attributes {
-        val saved = jline.enterRawMode()
-        fixupBlockingRawMode(jline)
-        rawAttributesSaved = saved
-        return saved
+    internal fun enterRawModeInternal(): RawModeHandle {
+        val handle = tty.enterRawMode()
+        rawModeHandle = handle
+        return handle
     }
 
     @PublishedApi
-    internal fun exitRawModeInternal(saved: Attributes) {
-        jline.attributes = saved
-        rawAttributesSaved = null
+    internal fun exitRawModeInternal(handle: RawModeHandle) {
+        handle.close()
+        rawModeHandle = null
     }
 
     /**
@@ -149,72 +143,20 @@ public class Terminal internal constructor(
     }
 
     override fun close() {
-        rawAttributesSaved?.let { jline.attributes = it }
+        rawModeHandle?.close()
+        rawModeHandle = null
         eventReader.shutdown()
-        jline.close()
+        tty.close()
     }
 
     public companion object {
         /**
-         * Force raw-mode termios into a configuration suitable for a TUI app
-         * that handles keys itself. After [org.jline.terminal.Terminal.enterRawMode]
-         * JLine 4.1.0 leaves two settings that hurt our use case:
-         *
-         *  - `VMIN=0, VTIME=1` (poll with 100ms timeout). The kernel returns
-         *    0 bytes after each timeout, which Java's `FileInputStream.read()`
-         *    translates into `-1` (EOF). That kills every input pump as soon
-         *    as the buffer drains. We override to `VMIN=1, VTIME=0` so
-         *    `read()` actually blocks until at least one byte is available
-         *    — the normal "raw cbreak" termios.
-         *
-         *  - `ISIG` left enabled, which means Ctrl+C / Ctrl+\ / Ctrl+Z still
-         *    generate SIGINT/SIGQUIT/SIGTSTP and kill the JVM out from under
-         *    us before our cleanup can run. TUI apps want those keys
-         *    delivered as bytes so bindings can react. We turn ISIG off; the
-         *    saved attributes restored on shutdown bring it back.
-         *
-         * Call this on any [org.jline.terminal.Terminal] right after
-         * [org.jline.terminal.Terminal.enterRawMode].
-         */
-        @JvmStatic
-        public fun fixupBlockingRawMode(jline: org.jline.terminal.Terminal) {
-            val attrs = jline.attributes
-            attrs.setControlChar(Attributes.ControlChar.VMIN, 1)
-            attrs.setControlChar(Attributes.ControlChar.VTIME, 0)
-            attrs.setLocalFlag(Attributes.LocalFlag.ISIG, false)
-            jline.attributes = attrs
-        }
-
-        /**
          * Open the system terminal — the user's actual TTY. Suitable for
-         * interactive programs.
+         * interactive programs. Falls back to a dumb impl when stdin/stdout
+         * aren't attached to a real console.
          */
         @JvmStatic
-        public fun system(): Terminal {
-            // nativeSignals(false): JLine 4.1.0's AbstractUnixSysTerminal
-            // unconditionally registers every value of the Terminal.Signal
-            // enum, which includes INFO (BSD/macOS-only). On Linux the
-            // registration returns null and ConcurrentHashMap.put throws NPE,
-            // taking the whole terminal construction down. We don't need
-            // JLine-managed signal handling; we wire WINCH ourselves in
-            // EventReader. See JLine issue tracker for the upstream bug.
-            //
-            // graphemeCluster(false): TerminalBuilder.build() otherwise probes
-            // the terminal via CSI ?2027$p + DA1 + (fallback) CSI 6n cursor-
-            // position queries to decide whether to enable mode 2027 for
-            // emoji clustering. If the probe's drain window (default 25ms) is
-            // too short for the terminal's response, the leftover cursor
-            // report bytes get parsed/echoed during App run or leak to the
-            // shell at exit. konsole doesn't use JLine's grapheme cluster
-            // mode (rich's Cells does its own width calculation), so we skip
-            // the probe entirely.
-            val jline = TerminalBuilder.builder()
-                .system(true)
-                .nativeSignals(false)
-                .graphemeCluster(false)
-                .build()
-            return Terminal(jline)
-        }
+        public fun system(): Terminal = Terminal(TtyFactory.system())
 
         /**
          * Construct a non-interactive terminal backed by the given streams,
@@ -226,12 +168,6 @@ public class Terminal internal constructor(
         public fun dumb(
             input: InputStream = System.`in`,
             output: OutputStream = System.out,
-        ): Terminal {
-            val jline = TerminalBuilder.builder()
-                .dumb(true)
-                .streams(input, output)
-                .build()
-            return Terminal(jline)
-        }
+        ): Terminal = Terminal(TtyFactory.dumb(input, output))
     }
 }

@@ -431,10 +431,10 @@ public abstract class App(
      * Designed to be called from `fun main()`.
      *
      * Terminates the JVM via [kotlin.system.exitProcess] once the run loop
-     * completes — terminal attributes have already been restored, and JLine's
-     * blocking native `read()` on stdin (running on a daemon thread JLine
-     * starts internally) can otherwise hold the process alive until the user
-     * presses a key. Override [exitProcessOnRun] to disable for embedded use.
+     * completes — terminal attributes have already been restored, and the
+     * EventReader pump (parked inside a blocking `tty.read()` on a daemon
+     * thread) can otherwise hold the process alive until the user presses a
+     * key. Override [exitProcessOnRun] to disable for embedded use.
      */
     public open fun run() {
         // `runBlocking` is intentionally NOT a child of [supervisor]: the
@@ -462,11 +462,11 @@ public abstract class App(
         }
         if (exitProcessOnRun) {
             // Runtime.halt instead of System.exit/exitProcess: shutdown hooks
-            // (notably JLine's) can themselves block on stdin in cooked mode
-            // after we've restored attributes, leaving the user stuck typing
-            // line-buffered input that nobody consumes. We've already restored
-            // termios and written the disable sequences, so there's nothing
-            // the shutdown hooks need to do that benefits the user.
+            // can block on stdin in cooked mode after we've restored
+            // attributes, leaving the user stuck typing line-buffered input
+            // that nobody consumes. We've already restored termios and
+            // written the disable sequences, so there's nothing the shutdown
+            // hooks need to do that benefits the user.
             Runtime.getRuntime().halt(0)
         }
     }

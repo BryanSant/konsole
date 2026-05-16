@@ -6,6 +6,7 @@ import tools.konsole.core.event.AnsiInputParser
 import tools.konsole.core.event.Event
 import tools.konsole.core.event.KeyCode
 import tools.konsole.core.event.KeyEventKind
+import tools.konsole.core.tty.Tty
 
 /**
  * Enter raw mode + the App's input-mode set (kitty / SGR mouse / bracketed
@@ -19,48 +20,47 @@ import tools.konsole.core.event.KeyEventKind
  * Press `q` to quit. Ctrl-C also quits.
  */
 public fun main() {
-    val term = Terminal.system()
-    val jline = term.underlying
-    System.err.println("[KeyEcho] terminal=${jline.type} size=${jline.size}")
-    val saved = jline.enterRawMode()
-    Terminal.fixupBlockingRawMode(jline)
+    Terminal.system().use { term ->
+        val tty = term.tty
+        val size = term.size
+        System.err.println("[KeyEcho] terminal=${tty.typeLabel} size=${size.columns}x${size.rows}")
 
-    val sbEnable = StringBuilder()
-    InputMode.EnableAll(kitty = true, mouseMotion = false).writeAnsi(sbEnable)
-    jline.writer().print(sbEnable.toString())
-    jline.writer().flush()
-    System.err.println("[KeyEcho] entered raw mode + kitty / SGR mouse / paste / focus / resize.")
-    System.err.println("[KeyEcho] press keys; 'q' or Ctrl-C quits. (Both presses and releases are reported.)")
+        term.rawMode {
+            val sbEnable = StringBuilder()
+            InputMode.EnableAll(kitty = true, mouseMotion = false).writeAnsi(sbEnable)
+            tty.out.append(sbEnable)
+            tty.out.flush()
+            System.err.println("[KeyEcho] entered raw mode + kitty / SGR mouse / paste / focus / resize.")
+            System.err.println("[KeyEcho] press keys; 'q' or Ctrl-C quits. (Both presses and releases are reported.)")
 
-    val parser = AnsiInputParser()
-    val reader = jline.reader()
-    try {
-        loop@ while (true) {
-            val b = reader.read()
-            if (b < 0) {
-                System.err.println("[KeyEcho] reader EOF; exiting")
-                break
-            }
-            val ev = parser.advance(b) ?: continue
-            System.err.println("[KeyEcho] $ev")
-            if (ev is Event.Key) {
-                val ke = ev.event
-                // Only quit on PRESS (not release/repeat) so we don't react to the
-                // companion release that arrives with REPORT_EVENT_TYPES enabled.
-                if (ke.kind == KeyEventKind.Press) {
-                    val code = ke.code
-                    if (code is KeyCode.Char && code.c == 'q' && !ke.modifiers.hasControl()) break@loop
-                    if (code is KeyCode.Char && code.c == 'c' && ke.modifiers.hasControl()) break@loop
+            val parser = AnsiInputParser()
+            try {
+                loop@ while (true) {
+                    val b = tty.read()
+                    if (b == Tty.EOF) {
+                        System.err.println("[KeyEcho] reader EOF; exiting")
+                        break
+                    }
+                    val ev = parser.advance(b) ?: continue
+                    System.err.println("[KeyEcho] $ev")
+                    if (ev is Event.Key) {
+                        val ke = ev.event
+                        // Only quit on PRESS (not release/repeat) so we don't react to the
+                        // companion release that arrives with REPORT_EVENT_TYPES enabled.
+                        if (ke.kind == KeyEventKind.Press) {
+                            val code = ke.code
+                            if (code is KeyCode.Char && code.c == 'q' && !ke.modifiers.hasControl()) break@loop
+                            if (code is KeyCode.Char && code.c == 'c' && ke.modifiers.hasControl()) break@loop
+                        }
+                    }
                 }
+                System.err.println("[KeyEcho] quitting; restoring terminal…")
+            } finally {
+                val sbDisable = StringBuilder()
+                InputMode.DisableAll(kitty = true, mouseMotion = false).writeAnsi(sbDisable)
+                tty.out.append(sbDisable)
+                tty.out.flush()
             }
         }
-        System.err.println("[KeyEcho] quitting; restoring terminal…")
-        val sbDisable = StringBuilder()
-        InputMode.DisableAll(kitty = true, mouseMotion = false).writeAnsi(sbDisable)
-        jline.writer().print(sbDisable.toString())
-        jline.writer().flush()
-    } finally {
-        jline.attributes = saved
-        term.close()
     }
 }
