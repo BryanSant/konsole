@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.onEach
 import tools.konsole.core.InputMode
 import tools.konsole.core.Terminal
 import tools.konsole.core.event.Event as CoreEvent
+import tools.konsole.core.event.KeyEventKind
 import tools.konsole.core.Hide as HideCursor
 import tools.konsole.core.terminal.EnterAlternateScreen
 import tools.konsole.core.terminal.LeaveAlternateScreen
@@ -123,7 +124,11 @@ public class TerminalDriver(
     override fun enableInput() { /* see disableInput */ }
 
     private fun translate(core: CoreEvent): TextualEvent? = when (core) {
-        is CoreEvent.Key -> Key(code = core.event.code, modifiers = core.event.modifiers)
+        // Kitty's REPORT_EVENT_TYPES emits a Release for every Press; the
+        // textual Key event carries no kind, so forwarding both would fire
+        // every binding twice. Repeats still flow through.
+        is CoreEvent.Key -> if (core.event.kind == KeyEventKind.Release) null
+            else Key(code = core.event.code, modifiers = core.event.modifiers)
         is CoreEvent.Mouse -> Click(core.event.column, core.event.row)
         is CoreEvent.Resize -> Resize(core.columns, core.rows)
         CoreEvent.FocusGained -> AppFocus()
