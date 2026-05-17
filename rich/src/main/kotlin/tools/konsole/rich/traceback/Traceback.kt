@@ -60,9 +60,8 @@ public class Traceback(
     public val localsMaxDepth: Int? = null,
 ) : Measurable {
 
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
-        for (s in renderable(console, options).render(console, options)) yield(s)
-    }
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> =
+        renderable(console, options).render(console, options)
 
     override fun measure(console: Console, options: RenderOptions): Measurement =
         Measurement(0, options.maxWidth)

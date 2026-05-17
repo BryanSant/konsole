@@ -37,16 +37,16 @@ public class Spinner(
         return frames[idx.coerceAtLeast(0)]
     }
 
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = buildList {
         val frame = frame()
-        if (style != null) yield(Segment(frame, style)) else yield(Segment(frame))
+        if (style != null) add(Segment(frame, style)) else add(Segment(frame))
         if (text != null) {
-            yield(Segment(" "))
+            add(Segment(" "))
             for (s in text.render(console, options.withMaxWidth((options.maxWidth - frame.length - 1).coerceAtLeast(1)))) {
-                yield(s)
+                add(s)
             }
         }
-    }
+    }.asSequence()
 
     override fun measure(console: Console, options: RenderOptions): Measurement {
         val frameWidth = frames.maxOf { it.length }

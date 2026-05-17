@@ -24,11 +24,9 @@ public class Columns(
 
     public constructor(vararg renderables: Renderable) : this(renderables.toList())
 
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
-        if (renderables.isEmpty()) return@sequence
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = buildList {
+        if (renderables.isEmpty()) return@buildList
         val total = options.maxWidth.coerceAtLeast(1)
-        // When equal=true, divide the available width across all renderables so they sit
-        // side-by-side. Otherwise size to the largest measured item.
         val cellWidth = when {
             width != null -> width
             equal -> ((total - padding * (renderables.size - 1)) / renderables.size).coerceAtLeast(1)
@@ -44,19 +42,18 @@ public class Columns(
         }
         val grid = renderables.chunked(perRow)
         for ((rowIdx, row) in grid.withIndex()) {
-            if (rowIdx > 0) yield(Segment.LINE)
-            // Render each item then arrange side-by-side; rows of multi-line items use the max height.
+            if (rowIdx > 0) add(Segment.LINE)
             val rendered = row.map {
                 wrapLines(collectLines(it.render(console, options.withMaxWidth(effectiveCellWidth))), effectiveCellWidth)
             }
             val height = rendered.maxOf { it.size }
             for (lineIdx in 0 until height) {
-                if (lineIdx > 0) yield(Segment.LINE)
+                if (lineIdx > 0) add(Segment.LINE)
                 for ((colIdx, lines) in rendered.withIndex()) {
-                    if (colIdx > 0) yield(Segment(" ".repeat(padding)))
+                    if (colIdx > 0) add(Segment(" ".repeat(padding)))
                     val line = lines.getOrNull(lineIdx)
                     if (line == null) {
-                        yield(Segment(" ".repeat(effectiveCellWidth)))
+                        add(Segment(" ".repeat(effectiveCellWidth)))
                     } else {
                         val pad = (effectiveCellWidth - line.cells).coerceAtLeast(0)
                         val (l, r) = when (align) {
@@ -67,14 +64,14 @@ public class Columns(
                             }
                             else -> 0 to pad
                         }
-                        if (l > 0) yield(Segment(" ".repeat(l)))
-                        for (s in line.segments) yield(s)
-                        if (r > 0) yield(Segment(" ".repeat(r)))
+                        if (l > 0) add(Segment(" ".repeat(l)))
+                        for (s in line.segments) add(s)
+                        if (r > 0) add(Segment(" ".repeat(r)))
                     }
                 }
             }
         }
-    }
+    }.asSequence()
 
     override fun measure(console: Console, options: RenderOptions): Measurement {
         if (renderables.isEmpty()) return Measurement.ZERO

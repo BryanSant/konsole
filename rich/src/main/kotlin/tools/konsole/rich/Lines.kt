@@ -11,13 +11,13 @@ public data class Lines(public val lines: List<Text>) : Renderable, Measurable {
 
     public constructor(vararg lines: Text) : this(lines.toList())
 
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = buildList {
         val newline = Segment("\n")
         for ((i, line) in lines.withIndex()) {
-            for (s in line.render(console, options)) yield(s)
-            if (i < lines.size - 1) yield(newline)
+            for (s in line.render(console, options)) add(s)
+            if (i < lines.size - 1) add(newline)
         }
-    }
+    }.asSequence()
 
     override fun measure(console: Console, options: RenderOptions): Measurement {
         if (lines.isEmpty()) return Measurement(0, 0)

@@ -27,11 +27,11 @@ public class Pretty(
     public val justify: Justify = Justify.Default,
 ) : Measurable {
 
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> {
         val theme = console.theme
         val sb = SegmentBuilder(theme)
         render(sb, target, depth = 0, options.maxWidth)
-        for (s in sb.segments) yield(s)
+        return sb.segments.asSequence()
     }
 
     override fun measure(console: Console, options: RenderOptions): Measurement =

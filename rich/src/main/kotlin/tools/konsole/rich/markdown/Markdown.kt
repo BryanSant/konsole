@@ -63,10 +63,10 @@ public class Markdown(
             .parse(markdown)
     }
 
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> {
         val state = State(console, options)
         renderNode(state, document, top = true)
-        for (s in state.flush()) yield(s)
+        return state.flush().asSequence()
     }
 
     override fun measure(console: Console, options: RenderOptions): Measurement =

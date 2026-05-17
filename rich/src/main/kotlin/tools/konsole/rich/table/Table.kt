@@ -107,8 +107,8 @@ public class Table(
         return this
     }
 
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
-        if (columns.isEmpty()) return@sequence
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = buildList {
+        if (columns.isEmpty()) return@buildList
         val outerWidth = (width ?: options.maxWidth).coerceAtMost(options.maxWidth).coerceAtLeast(1)
         val widths = computeColumnWidths(console, options, outerWidth)
         val totalInner = widths.sum() + ((columns.size - 1) * if (box == null) 1 else 1)
@@ -117,83 +117,75 @@ public class Table(
         val borderS = borderStyle ?: if (style.isNull) null else style
         val box = box
 
-        // Title.
         if (title != null) {
             val rendered = renderInline(title, options.withMaxWidth(totalOuter))
-            yieldAll(centeredSingleLine(rendered, totalOuter, titleJustify, titleStyle))
-            yield(Segment.LINE)
+            addAll(centeredSingleLine(rendered, totalOuter, titleJustify, titleStyle))
+            add(Segment.LINE)
         }
 
-        // Top border.
         if (box != null && showEdge) {
-            yield(Segment(box.getTop(widths), borderS))
-            yield(Segment.LINE)
+            add(Segment(box.getTop(widths), borderS))
+            add(Segment.LINE)
         }
 
-        // Header.
         if (showHeader && columns.any { it.header != null }) {
             val cells = columns.map { it.header ?: Text("") }
             val resolvedHeaderStyle = headerStyle ?: console.theme["table.header"] ?: Style(bold = true)
             for (line in renderRowLines(console, options, cells, widths, headerOverride = true, defaultStyle = resolvedHeaderStyle)) {
-                yieldAll(line)
-                yield(Segment.LINE)
+                addAll(line)
+                add(Segment.LINE)
             }
             if (box != null) {
-                yield(Segment(box.getHeadRow(widths), borderS))
-                yield(Segment.LINE)
+                add(Segment(box.getHeadRow(widths), borderS))
+                add(Segment.LINE)
             }
         }
 
-        // Body rows.
         for (rowIdx in 0 until rowCount) {
             val cellRenderables = columns.map { it.cells.getOrNull(rowIdx) ?: Text("") }
             val baseRowStyle = rows[rowIdx].style
                 ?: rowStyles.getOrNull(rowIdx % rowStyles.size.coerceAtLeast(1)).takeIf { rowStyles.isNotEmpty() }
             val lines = renderRowLines(console, options, cellRenderables, widths, headerOverride = false, defaultStyle = baseRowStyle)
             for (line in lines) {
-                yieldAll(line)
-                yield(Segment.LINE)
+                addAll(line)
+                add(Segment.LINE)
             }
-            // Section divider or per-row line.
             val isLast = rowIdx == rowCount - 1
             if (!isLast) {
                 if (rows[rowIdx].endSection || showLines) {
                     if (box != null) {
-                        yield(Segment(box.getRow(widths), borderS))
-                        yield(Segment.LINE)
+                        add(Segment(box.getRow(widths), borderS))
+                        add(Segment.LINE)
                     }
                 }
             }
         }
 
-        // Footer.
         if (showFooter && columns.any { it.footer != null }) {
             if (box != null) {
-                yield(Segment(box.getFootRow(widths), borderS))
-                yield(Segment.LINE)
+                add(Segment(box.getFootRow(widths), borderS))
+                add(Segment.LINE)
             }
             val cells = columns.map { it.footer ?: Text("") }
             val resolvedFooterStyle = footerStyle ?: console.theme["table.footer"] ?: Style(bold = true)
             for (line in renderRowLines(console, options, cells, widths, headerOverride = true, defaultStyle = resolvedFooterStyle)) {
-                yieldAll(line)
-                yield(Segment.LINE)
+                addAll(line)
+                add(Segment.LINE)
             }
         }
 
-        // Bottom border.
         if (box != null && showEdge) {
-            yield(Segment(box.getBottom(widths), borderS))
+            add(Segment(box.getBottom(widths), borderS))
         }
 
-        // Caption.
         if (caption != null) {
-            yield(Segment.LINE)
+            add(Segment.LINE)
             val rendered = renderInline(caption, options.withMaxWidth(totalOuter))
-            yieldAll(centeredSingleLine(rendered, totalOuter, captionJustify, captionStyle))
+            addAll(centeredSingleLine(rendered, totalOuter, captionJustify, captionStyle))
         }
-    }
+    }.asSequence()
 
-    private fun centeredSingleLine(text: Pair<List<Segment>, Int>, totalWidth: Int, justify: Justify, style: Style?): Sequence<Segment> = sequence {
+    private fun centeredSingleLine(text: Pair<List<Segment>, Int>, totalWidth: Int, justify: Justify, style: Style?): List<Segment> = buildList {
         val (segs, cells) = text
         val pad = (totalWidth - cells).coerceAtLeast(0)
         val (left, right) = when (justify) {
@@ -204,10 +196,10 @@ public class Table(
                 l to (pad - l)
             }
         }
-        if (left > 0) yield(Segment(" ".repeat(left), style))
-        if (style != null) for (s in segs) yield(if (s.style == null) Segment(s.text, style) else s)
-        else for (s in segs) yield(s)
-        if (right > 0) yield(Segment(" ".repeat(right), style))
+        if (left > 0) add(Segment(" ".repeat(left), style))
+        if (style != null) for (s in segs) add(if (s.style == null) Segment(s.text, style) else s)
+        else for (s in segs) add(s)
+        if (right > 0) add(Segment(" ".repeat(right), style))
     }
 
     private fun renderInline(r: Renderable, options: RenderOptions): Pair<List<Segment>, Int> {
@@ -230,33 +222,30 @@ public class Table(
         widths: List<Int>,
         headerOverride: Boolean,
         defaultStyle: Style?,
-    ): List<Sequence<Segment>> {
-        // Render each cell, applying padding inside its column width.
+    ): List<List<Segment>> {
         val cellLines: List<List<tools.konsole.rich.layout.CollectedLine>> = cells.mapIndexed { i, cell ->
             val col = columns[i]
             val padHoriz = padding.horizontal
             val cellWidth = (widths[i] - padHoriz).coerceAtLeast(1)
-            val lines = collectLines(cell.render(console, options.update(maxWidth = cellWidth, overflow = col.overflow, noWrap = col.noWrap)))
-            lines
+            collectLines(cell.render(console, options.update(maxWidth = cellWidth, overflow = col.overflow, noWrap = col.noWrap)))
         }
         val maxLines = cellLines.maxOf { it.size }
         val borderS = borderStyle ?: if (style.isNull) null else style
-        val out = mutableListOf<Sequence<Segment>>()
+        val out = mutableListOf<List<Segment>>()
         for (lineIdx in 0 until maxLines) {
-            val line = sequence {
-                if (box != null && showEdge) yield(Segment(box.midLeft.toString(), borderS))
+            val line = buildList {
+                if (box != null && showEdge) add(Segment(box.midLeft.toString(), borderS))
                 for ((i, lines) in cellLines.withIndex()) {
-                    if (i > 0 && box != null) yield(Segment(box.midDivider.toString(), borderS))
+                    if (i > 0 && box != null) add(Segment(box.midDivider.toString(), borderS))
                     val col = columns[i]
                     val cellLine = lines.getOrNull(lineIdx)
                     val cellW = widths[i] - padding.horizontal
                     val resolvedJustify = col.justify
                     val cellStyle = col.style ?: defaultStyle
-                    if (padding.left > 0) yield(if (cellStyle != null) Segment(" ".repeat(padding.left), cellStyle) else Segment(" ".repeat(padding.left)))
+                    if (padding.left > 0) add(if (cellStyle != null) Segment(" ".repeat(padding.left), cellStyle) else Segment(" ".repeat(padding.left)))
                     if (cellLine == null) {
-                        // Empty padding row
-                        if (cellStyle != null) yield(Segment(" ".repeat(cellW.coerceAtLeast(0)), cellStyle))
-                        else yield(Segment(" ".repeat(cellW.coerceAtLeast(0))))
+                        if (cellStyle != null) add(Segment(" ".repeat(cellW.coerceAtLeast(0)), cellStyle))
+                        else add(Segment(" ".repeat(cellW.coerceAtLeast(0))))
                     } else {
                         val totalCells = cellLine.cells
                         val leftover = (cellW - totalCells).coerceAtLeast(0)
@@ -268,17 +257,17 @@ public class Table(
                             }
                             else -> 0 to leftover
                         }
-                        if (lp > 0) yield(if (cellStyle != null) Segment(" ".repeat(lp), cellStyle) else Segment(" ".repeat(lp)))
+                        if (lp > 0) add(if (cellStyle != null) Segment(" ".repeat(lp), cellStyle) else Segment(" ".repeat(lp)))
                         if (cellStyle != null) {
-                            for (s in cellLine.segments) yield(if (s.style == null) Segment(s.text, cellStyle) else s)
+                            for (s in cellLine.segments) add(if (s.style == null) Segment(s.text, cellStyle) else s)
                         } else {
-                            for (s in cellLine.segments) yield(s)
+                            for (s in cellLine.segments) add(s)
                         }
-                        if (rp > 0) yield(if (cellStyle != null) Segment(" ".repeat(rp), cellStyle) else Segment(" ".repeat(rp)))
+                        if (rp > 0) add(if (cellStyle != null) Segment(" ".repeat(rp), cellStyle) else Segment(" ".repeat(rp)))
                     }
-                    if (padding.right > 0) yield(if (cellStyle != null) Segment(" ".repeat(padding.right), cellStyle) else Segment(" ".repeat(padding.right)))
+                    if (padding.right > 0) add(if (cellStyle != null) Segment(" ".repeat(padding.right), cellStyle) else Segment(" ".repeat(padding.right)))
                 }
-                if (box != null && showEdge) yield(Segment(box.midRight.toString(), borderS))
+                if (box != null && showEdge) add(Segment(box.midRight.toString(), borderS))
             }
             out += line
         }

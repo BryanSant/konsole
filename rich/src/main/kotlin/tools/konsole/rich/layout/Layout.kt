@@ -65,14 +65,14 @@ public class Layout(
 
     private fun isBranch(): Boolean = direction != null && _children.any { it.visible }
 
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = buildList {
         val height = options.height ?: console.height
         val rows: List<List<CollectedLine>> = renderRegion(console, options.maxWidth, height)
         for ((idx, row) in rows.withIndex()) {
-            if (idx > 0) yield(Segment.LINE)
-            for (s in row.flatMap { it.segments }) yield(s)
+            if (idx > 0) add(Segment.LINE)
+            for (s in row.flatMap { it.segments }) add(s)
         }
-    }
+    }.asSequence()
 
     /** Render this layout into [width] x [height] cells; returns one [CollectedLine] per output row. */
     private fun renderRegion(console: Console, width: Int, height: Int): List<List<CollectedLine>> {

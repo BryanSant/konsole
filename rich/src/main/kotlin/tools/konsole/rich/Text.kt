@@ -125,13 +125,12 @@ public class Text(
         return out
     }
 
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = buildList {
         val plain = sb.toString()
         if (plain.isEmpty()) {
-            if (endChar.isNotEmpty()) yieldAll(splitOnNewlines(endChar, style))
-            return@sequence
+            if (endChar.isNotEmpty()) appendSplitOnNewlines(endChar, style)
+            return@buildList
         }
-        // Build the per-character style by layering: base [style] then each [span] last-wins.
         val n = plain.length
         val perChar = arrayOfNulls<Style>(n)
         if (!style.isNull) for (i in 0 until n) perChar[i] = style
@@ -147,34 +146,33 @@ public class Text(
             val ch = plain[i]
             if (ch == '\n') {
                 if (i > runStart) {
-                    yield(Segment(plain.substring(runStart, i), perChar[runStart]))
+                    add(Segment(plain.substring(runStart, i), perChar[runStart]))
                 }
-                yield(Segment.LINE)
+                add(Segment.LINE)
                 runStart = i + 1
                 i = runStart
                 continue
             }
-            // Boundary on style change.
             if (i > runStart && perChar[i] != perChar[i - 1]) {
-                yield(Segment(plain.substring(runStart, i), perChar[runStart]))
+                add(Segment(plain.substring(runStart, i), perChar[runStart]))
                 runStart = i
             }
             i += 1
         }
-        if (runStart < n) yield(Segment(plain.substring(runStart, n), perChar[runStart]))
-        if (endChar.isNotEmpty()) yieldAll(splitOnNewlines(endChar, style))
-    }
+        if (runStart < n) add(Segment(plain.substring(runStart, n), perChar[runStart]))
+        if (endChar.isNotEmpty()) appendSplitOnNewlines(endChar, style)
+    }.asSequence()
 
-    private fun splitOnNewlines(s: String, style: Style): Sequence<Segment> = sequence {
+    private fun MutableList<Segment>.appendSplitOnNewlines(s: String, style: Style) {
         var start = 0
         var idx = s.indexOf('\n')
         while (idx >= 0) {
-            if (idx > start) yield(Segment(s.substring(start, idx), if (style.isNull) null else style))
-            yield(Segment.LINE)
+            if (idx > start) add(Segment(s.substring(start, idx), if (style.isNull) null else style))
+            add(Segment.LINE)
             start = idx + 1
             idx = s.indexOf('\n', start)
         }
-        if (start < s.length) yield(Segment(s.substring(start), if (style.isNull) null else style))
+        if (start < s.length) add(Segment(s.substring(start), if (style.isNull) null else style))
     }
 
     override fun measure(console: Console, options: RenderOptions): Measurement {
@@ -233,17 +231,15 @@ public data class Span(public val start: Int, public val end: Int, public val st
  * which is already serialized SGR + content + reset.
  */
 public class RawAnsi(public val ansi: String) : Renderable {
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
-        // We can't introspect the pre-rendered escapes; emit as a single styleless segment.
-        // The pipeline's emitter will Print() the contents verbatim.
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = buildList {
         var start = 0
         var idx = ansi.indexOf('\n')
         while (idx >= 0) {
-            if (idx > start) yield(Segment(ansi.substring(start, idx), null))
-            yield(Segment.LINE)
+            if (idx > start) add(Segment(ansi.substring(start, idx), null))
+            add(Segment.LINE)
             start = idx + 1
             idx = ansi.indexOf('\n', start)
         }
-        if (start < ansi.length) yield(Segment(ansi.substring(start), null))
-    }
+        if (start < ansi.length) add(Segment(ansi.substring(start), null))
+    }.asSequence()
 }

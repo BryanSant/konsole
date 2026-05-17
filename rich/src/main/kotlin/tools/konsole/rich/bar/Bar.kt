@@ -31,18 +31,19 @@ public class Bar(
         require(end in begin..size) { "end out of [begin, size]: $end" }
     }
 
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = buildList {
         val w = (width ?: options.maxWidth).coerceAtMost(options.maxWidth).coerceAtLeast(1)
-        val total = if (size <= 0.0) 1.0 else size
+        val barSize = this@Bar.size
+        val total = if (barSize <= 0.0) 1.0 else barSize
         val beginCol = ((begin / total) * w).toInt().coerceIn(0, w)
         val endCol = ((end / total) * w).toInt().coerceIn(beginCol, w)
         val left = beginCol
         val mid = endCol - beginCol
         val right = w - endCol
-        if (left > 0) yield(Segment(backChar.toString().repeat(left), Style(color = backgroundColor)))
-        if (mid > 0) yield(Segment(completeChar.toString().repeat(mid), Style(color = color)))
-        if (right > 0) yield(Segment(backChar.toString().repeat(right), Style(color = backgroundColor)))
-    }
+        if (left > 0) add(Segment(backChar.toString().repeat(left), Style(color = backgroundColor)))
+        if (mid > 0) add(Segment(completeChar.toString().repeat(mid), Style(color = color)))
+        if (right > 0) add(Segment(backChar.toString().repeat(right), Style(color = backgroundColor)))
+    }.asSequence()
 
     override fun measure(console: Console, options: RenderOptions): Measurement {
         val w = (width ?: options.maxWidth).coerceAtMost(options.maxWidth)

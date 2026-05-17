@@ -33,46 +33,40 @@ public class Panel(
     public val width: Int? = null,
 ) : Measurable {
 
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = buildList {
         val outer = (width ?: options.maxWidth).coerceAtMost(options.maxWidth).coerceAtLeast(2)
-        // Inner = outer - 2 (borders) - horizontal padding
         val inner = (outer - 2 - padding.horizontal).coerceAtLeast(1)
         val borderS = if (borderStyle.isNull) null else borderStyle
         val bodyS = if (style.isNull) null else style
 
-        // Top border with optional title.
-        yieldAll(renderTopBorder(outer, inner, console, options, borderS))
-        yield(Segment.LINE)
+        addTopBorder(outer, inner, console, options, borderS)
+        add(Segment.LINE)
 
-        // Top padding rows.
         repeat(padding.top) {
-            yieldRow(outer, inner, listOf(), 0, borderS, bodyS)
-            yield(Segment.LINE)
+            addRow(outer, inner, listOf(), 0, borderS, bodyS)
+            add(Segment.LINE)
         }
 
-        // Body lines.
         val bodyOpts = options.withMaxWidth(inner)
         val bodyLines = wrapLines(collectLines(renderable.render(console, bodyOpts)), inner)
         for ((i, line) in bodyLines.withIndex()) {
-            if (i > 0) yield(Segment.LINE)
-            yieldRow(outer, inner, line.segments, line.cells, borderS, bodyS)
+            if (i > 0) add(Segment.LINE)
+            addRow(outer, inner, line.segments, line.cells, borderS, bodyS)
         }
         if (bodyLines.isEmpty()) {
-            yieldRow(outer, inner, listOf(), 0, borderS, bodyS)
+            addRow(outer, inner, listOf(), 0, borderS, bodyS)
         }
 
-        // Bottom padding rows.
         repeat(padding.bottom) {
-            yield(Segment.LINE)
-            yieldRow(outer, inner, listOf(), 0, borderS, bodyS)
+            add(Segment.LINE)
+            addRow(outer, inner, listOf(), 0, borderS, bodyS)
         }
 
-        // Bottom border with optional subtitle.
-        yield(Segment.LINE)
-        yieldAll(renderBottomBorder(outer, inner, console, options, borderS))
-    }
+        add(Segment.LINE)
+        addBottomBorder(outer, inner, console, options, borderS)
+    }.asSequence()
 
-    private suspend fun SequenceScope<Segment>.yieldRow(
+    private fun MutableList<Segment>.addRow(
         outer: Int,
         inner: Int,
         bodySegments: List<Segment>,
@@ -80,69 +74,63 @@ public class Panel(
         borderS: Style?,
         bodyS: Style?,
     ) {
-        // Left border + left padding
-        yield(Segment(box.midLeft.toString(), borderS))
-        if (padding.left > 0) yield(if (bodyS != null) Segment(" ".repeat(padding.left), bodyS) else Segment(" ".repeat(padding.left)))
-        // Body
-        for (s in bodySegments) yield(s)
-        // Right pad to inner width
+        add(Segment(box.midLeft.toString(), borderS))
+        if (padding.left > 0) add(if (bodyS != null) Segment(" ".repeat(padding.left), bodyS) else Segment(" ".repeat(padding.left)))
+        for (s in bodySegments) add(s)
         val rightFill = (inner - bodyCells).coerceAtLeast(0)
-        if (rightFill > 0) yield(if (bodyS != null) Segment(" ".repeat(rightFill), bodyS) else Segment(" ".repeat(rightFill)))
-        // Right padding
-        if (padding.right > 0) yield(if (bodyS != null) Segment(" ".repeat(padding.right), bodyS) else Segment(" ".repeat(padding.right)))
-        // Right border
-        yield(Segment(box.midRight.toString(), borderS))
+        if (rightFill > 0) add(if (bodyS != null) Segment(" ".repeat(rightFill), bodyS) else Segment(" ".repeat(rightFill)))
+        if (padding.right > 0) add(if (bodyS != null) Segment(" ".repeat(padding.right), bodyS) else Segment(" ".repeat(padding.right)))
+        add(Segment(box.midRight.toString(), borderS))
     }
 
-    private fun renderTopBorder(
+    private fun MutableList<Segment>.addTopBorder(
         outer: Int,
         inner: Int,
         console: Console,
         options: RenderOptions,
         borderS: Style?,
-    ): Sequence<Segment> = sequence {
+    ) {
         val titleText = title?.let { textOf(it, console, options.withMaxWidth(outer - 4)) }
         val titleCells = titleText?.cells ?: 0
         if (titleText == null || titleCells == 0) {
-            // Plain top border.
-            yield(Segment("${box.topLeft}${box.topHorizontal.toString().repeat(outer - 2)}${box.topRight}", borderS))
-            return@sequence
+            add(Segment("${box.topLeft}${box.topHorizontal.toString().repeat(outer - 2)}${box.topRight}", borderS))
+            return
         }
         val padded = " ".plus(titleText.text).plus(" ")
         val displayLen = titleCells + 2
         val edgeWidth = outer - 2
         val sideTotal = (edgeWidth - displayLen).coerceAtLeast(0)
         val (left, right) = sidesFor(titleAlign, sideTotal)
-        yield(Segment(box.topLeft.toString(), borderS))
-        if (left > 0) yield(Segment(box.topHorizontal.toString().repeat(left), borderS))
-        yield(Segment(padded, null))
-        if (right > 0) yield(Segment(box.topHorizontal.toString().repeat(right), borderS))
-        yield(Segment(box.topRight.toString(), borderS))
+        add(Segment(box.topLeft.toString(), borderS))
+        if (left > 0) add(Segment(box.topHorizontal.toString().repeat(left), borderS))
+        add(Segment(padded, null))
+        if (right > 0) add(Segment(box.topHorizontal.toString().repeat(right), borderS))
+        add(Segment(box.topRight.toString(), borderS))
     }
 
-    private fun renderBottomBorder(
+    private fun MutableList<Segment>.addBottomBorder(
         outer: Int,
         inner: Int,
         console: Console,
         options: RenderOptions,
         borderS: Style?,
-    ): Sequence<Segment> = sequence {
+    ) {
         val subtitleText = subtitle?.let { textOf(it, console, options.withMaxWidth(outer - 4)) }
         val cells = subtitleText?.cells ?: 0
         if (subtitleText == null || cells == 0) {
-            yield(Segment("${box.bottomLeft}${box.bottomHorizontal.toString().repeat(outer - 2)}${box.bottomRight}", borderS))
-            return@sequence
+            add(Segment("${box.bottomLeft}${box.bottomHorizontal.toString().repeat(outer - 2)}${box.bottomRight}", borderS))
+            return
         }
         val padded = " ".plus(subtitleText.text).plus(" ")
         val displayLen = cells + 2
         val edgeWidth = outer - 2
         val sideTotal = (edgeWidth - displayLen).coerceAtLeast(0)
         val (left, right) = sidesFor(subtitleAlign, sideTotal)
-        yield(Segment(box.bottomLeft.toString(), borderS))
-        if (left > 0) yield(Segment(box.bottomHorizontal.toString().repeat(left), borderS))
-        yield(Segment(padded, null))
-        if (right > 0) yield(Segment(box.bottomHorizontal.toString().repeat(right), borderS))
-        yield(Segment(box.bottomRight.toString(), borderS))
+        add(Segment(box.bottomLeft.toString(), borderS))
+        if (left > 0) add(Segment(box.bottomHorizontal.toString().repeat(left), borderS))
+        add(Segment(padded, null))
+        if (right > 0) add(Segment(box.bottomHorizontal.toString().repeat(right), borderS))
+        add(Segment(box.bottomRight.toString(), borderS))
     }
 
     private data class FlatText(val text: String, val cells: Int)

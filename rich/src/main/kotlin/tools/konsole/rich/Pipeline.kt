@@ -93,10 +93,10 @@ internal object Pipeline {
 
 /** Fills null Style fields from a base, threading inherited style through nested renders. */
 internal object SegmentResolver {
-    fun resolve(input: Sequence<Segment>, base: Style): Sequence<Segment> = sequence {
+    fun resolve(input: Sequence<Segment>, base: Style): Sequence<Segment> = buildList {
         for (seg in input) {
             if (seg.control is Control.NewLine) {
-                yield(seg)
+                add(seg)
                 continue
             }
             if (seg.text.isEmpty() && seg.control == null) continue
@@ -104,9 +104,9 @@ internal object SegmentResolver {
                 seg.style == null -> if (base.isNull) null else base
                 else -> if (base.isNull) seg.style else base + seg.style
             }
-            yield(Segment(seg.text, merged, seg.control))
+            add(Segment(seg.text, merged, seg.control))
         }
-    }
+    }.asSequence()
 }
 
 /**

@@ -47,46 +47,40 @@ public class Padded(
     public val style: Style? = null,
 ) : Measurable {
 
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = buildList {
         val outer = options.maxWidth
         val inner = (outer - padding.horizontal).coerceAtLeast(1)
         val childOptions = options.withMaxWidth(inner)
         val targetWidth = if (expand) outer else outer
         val padStyle = style
 
-        // Top padding lines.
         repeat(padding.top) {
-            if (padStyle != null) yield(Segment(" ".repeat(targetWidth), padStyle))
-            else if (targetWidth > 0) yield(Segment(" ".repeat(targetWidth)))
-            yield(Segment.LINE)
+            if (padStyle != null) add(Segment(" ".repeat(targetWidth), padStyle))
+            else if (targetWidth > 0) add(Segment(" ".repeat(targetWidth)))
+            add(Segment.LINE)
         }
 
-        // Buffer child lines so we can pad each side correctly.
         val childLines = collectLines(renderable.render(console, childOptions))
         for ((idx, line) in childLines.withIndex()) {
-            if (idx > 0) yield(Segment.LINE)
-            // Left pad
+            if (idx > 0) add(Segment.LINE)
             if (padding.left > 0) {
-                if (padStyle != null) yield(Segment(" ".repeat(padding.left), padStyle))
-                else yield(Segment(" ".repeat(padding.left)))
+                if (padStyle != null) add(Segment(" ".repeat(padding.left), padStyle))
+                else add(Segment(" ".repeat(padding.left)))
             }
-            // Child segments
-            for (s in line.segments) yield(s)
-            // Right pad — pad to targetWidth - left - lineWidth
+            for (s in line.segments) add(s)
             val rightPad = padding.right + (if (expand) (inner - line.cells).coerceAtLeast(0) else 0)
             if (rightPad > 0) {
-                if (padStyle != null) yield(Segment(" ".repeat(rightPad), padStyle))
-                else yield(Segment(" ".repeat(rightPad)))
+                if (padStyle != null) add(Segment(" ".repeat(rightPad), padStyle))
+                else add(Segment(" ".repeat(rightPad)))
             }
         }
 
-        // Bottom padding lines.
         repeat(padding.bottom) {
-            yield(Segment.LINE)
-            if (padStyle != null) yield(Segment(" ".repeat(targetWidth), padStyle))
-            else if (targetWidth > 0) yield(Segment(" ".repeat(targetWidth)))
+            add(Segment.LINE)
+            if (padStyle != null) add(Segment(" ".repeat(targetWidth), padStyle))
+            else if (targetWidth > 0) add(Segment(" ".repeat(targetWidth)))
         }
-    }
+    }.asSequence()
 
     override fun measure(console: Console, options: RenderOptions): Measurement {
         val inner = (options.maxWidth - padding.horizontal).coerceAtLeast(0)

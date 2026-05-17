@@ -26,12 +26,11 @@ public class Align(
     public val height: Int? = null,
 ) : Measurable {
 
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = buildList {
         val outerWidth = (width ?: options.maxWidth).coerceAtMost(options.maxWidth).coerceAtLeast(0)
         val targetHeight = height
         val childOpts = options.withMaxWidth(outerWidth)
         val lines = collectLines(renderable.render(console, childOpts))
-        // Vertical pad calculation (only meaningful if [height] specified)
         val totalLines = lines.size
         val (topPad, bottomPad) = if (targetHeight != null && targetHeight > totalLines) {
             val pad = targetHeight - totalLines
@@ -49,14 +48,14 @@ public class Align(
 
         repeat(topPad) {
             if (pad && outerWidth > 0) {
-                if (padStyle != null) yield(Segment(" ".repeat(outerWidth), padStyle))
-                else yield(Segment(" ".repeat(outerWidth)))
+                if (padStyle != null) add(Segment(" ".repeat(outerWidth), padStyle))
+                else add(Segment(" ".repeat(outerWidth)))
             }
-            yield(Segment.LINE)
+            add(Segment.LINE)
         }
 
         for ((idx, line) in lines.withIndex()) {
-            if (idx > 0) yield(Segment.LINE)
+            if (idx > 0) add(Segment.LINE)
             val leftover = (outerWidth - line.cells).coerceAtLeast(0)
             val (leftPad, rightPad) = when (align) {
                 Justify.Default, Justify.Left, Justify.Full -> 0 to leftover
@@ -66,19 +65,19 @@ public class Align(
                     l to (leftover - l)
                 }
             }
-            if (leftPad > 0) yield(if (padStyle != null) Segment(" ".repeat(leftPad), padStyle) else Segment(" ".repeat(leftPad)))
-            for (s in line.segments) yield(s)
-            if (pad && rightPad > 0) yield(if (padStyle != null) Segment(" ".repeat(rightPad), padStyle) else Segment(" ".repeat(rightPad)))
+            if (leftPad > 0) add(if (padStyle != null) Segment(" ".repeat(leftPad), padStyle) else Segment(" ".repeat(leftPad)))
+            for (s in line.segments) add(s)
+            if (pad && rightPad > 0) add(if (padStyle != null) Segment(" ".repeat(rightPad), padStyle) else Segment(" ".repeat(rightPad)))
         }
 
         repeat(bottomPad) {
-            yield(Segment.LINE)
+            add(Segment.LINE)
             if (pad && outerWidth > 0) {
-                if (padStyle != null) yield(Segment(" ".repeat(outerWidth), padStyle))
-                else yield(Segment(" ".repeat(outerWidth)))
+                if (padStyle != null) add(Segment(" ".repeat(outerWidth), padStyle))
+                else add(Segment(" ".repeat(outerWidth)))
             }
         }
-    }
+    }.asSequence()
 
     override fun measure(console: Console, options: RenderOptions): Measurement {
         val w = width ?: options.maxWidth

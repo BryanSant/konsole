@@ -34,7 +34,7 @@ public class Syntax(
     }
     private val tokens: List<Token> = lexer.tokenize(code)
 
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = buildList {
         val lines = code.lines()
         val totalLines = lines.size
         val numWidth = if (lineNumbers) (startLine + totalLines - 1).toString().length else 0
@@ -43,7 +43,6 @@ public class Syntax(
         val bg = backgroundColor ?: theme.background?.bgcolor
         val baseLineStyle = if (bg != null) Style(bgcolor = bg) else Style.NULL
 
-        // Build a map from char index → token for quick lookup.
         val tokenAt = IntArray(code.length + 1) { -1 }
         for ((idx, tok) in tokens.withIndex()) {
             for (i in tok.start until tok.end.coerceAtMost(code.length)) tokenAt[i] = idx
@@ -55,22 +54,21 @@ public class Syntax(
             val isHighlighted = lineNumber in highlightLines
             val lineBg: tools.konsole.core.style.Color? = if (isHighlighted && theme.highlight != null) theme.highlight.bgcolor else bg
 
-            if (lineIdx > 0) yield(Segment.LINE)
+            if (lineIdx > 0) add(Segment.LINE)
 
             if (lineNumbers) {
                 val numStr = lineNumber.toString().padStart(numWidth)
-                yield(Segment(numStr, theme[TokenType.LINE_NUMBER]))
-                yield(Segment("  ", theme[TokenType.LINE_NUMBER]))
+                add(Segment(numStr, theme[TokenType.LINE_NUMBER]))
+                add(Segment("  ", theme[TokenType.LINE_NUMBER]))
             }
 
             val lineStart = charCursor
             val lineEnd = lineStart + line.length
-            // Walk this line, emitting segments per token boundary.
             var i = lineStart
             while (i < lineEnd) {
                 val tIdx = tokenAt[i]
                 if (tIdx < 0) {
-                    yield(Segment(code.substring(i, i + 1), if (lineBg != null) Style(bgcolor = lineBg) else null))
+                    add(Segment(code.substring(i, i + 1), if (lineBg != null) Style(bgcolor = lineBg) else null))
                     i += 1
                 } else {
                     val tok = tokens[tIdx]
@@ -79,14 +77,14 @@ public class Syntax(
                     val style = theme[tok.type].let { st ->
                         if (lineBg != null && st.bgcolor == null) st.copy(bgcolor = lineBg) else st
                     }
-                    yield(Segment(text, if (style.isNull) null else style))
+                    add(Segment(text, if (style.isNull) null else style))
                     i = end
                 }
             }
 
-            charCursor = lineEnd + 1 // +1 for the '\n'
+            charCursor = lineEnd + 1
         }
-    }
+    }.asSequence()
 
     override fun measure(console: Console, options: RenderOptions): Measurement {
         val longest = code.lines().maxOfOrNull { it.length } ?: 0

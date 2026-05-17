@@ -13,16 +13,16 @@ public data class Styled(
     public val style: Style,
 ) : Renderable, Measurable {
 
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = buildList {
         for (seg in renderable.render(console, options)) {
             if (seg.control != null) {
-                yield(seg)
+                add(seg)
             } else {
                 val merged = if (seg.style == null) style else style + seg.style
-                yield(Segment(seg.text, merged, null))
+                add(Segment(seg.text, merged, null))
             }
         }
-    }
+    }.asSequence()
 
     override fun measure(console: Console, options: RenderOptions): Measurement =
         if (renderable is Measurable) renderable.measure(console, options)

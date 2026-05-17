@@ -18,18 +18,18 @@ public class Rule(
     public val align: Justify = Justify.Center,
 ) : Measurable {
 
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = buildList {
         val width = options.maxWidth
         val displayStyle = if (style.isNull) null else style
         if (title.isNullOrBlank()) {
-            yield(Segment(char.toString().repeat(width), displayStyle))
-            return@sequence
+            add(Segment(char.toString().repeat(width), displayStyle))
+            return@buildList
         }
         val padded = " $title "
         val titleLen = padded.length
         if (titleLen >= width) {
-            yield(Segment(padded.take(width), displayStyle))
-            return@sequence
+            add(Segment(padded.take(width), displayStyle))
+            return@buildList
         }
         val sideTotal = width - titleLen
         val (leftCount, rightCount) = when (align) {
@@ -40,10 +40,10 @@ public class Rule(
                 l to (sideTotal - l)
             }
         }
-        if (leftCount > 0) yield(Segment(char.toString().repeat(leftCount), displayStyle))
-        yield(Segment(padded, displayStyle))
-        if (rightCount > 0) yield(Segment(char.toString().repeat(rightCount), displayStyle))
-    }
+        if (leftCount > 0) add(Segment(char.toString().repeat(leftCount), displayStyle))
+        add(Segment(padded, displayStyle))
+        if (rightCount > 0) add(Segment(char.toString().repeat(rightCount), displayStyle))
+    }.asSequence()
 
     override fun measure(console: Console, options: RenderOptions): Measurement =
         Measurement(options.maxWidth, options.maxWidth)

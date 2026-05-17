@@ -64,11 +64,11 @@ public class Tree(
     /** Number of immediate children. */
     public val childCount: Int get() = children.size
 
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = buildList {
         renderInto(this@Tree, console, options, prefix = listOf(), isLast = true, isRoot = true)
-    }
+    }.asSequence()
 
-    private suspend fun SequenceScope<Segment>.renderInto(
+    private fun MutableList<Segment>.renderInto(
         node: Tree,
         console: Console,
         options: RenderOptions,
@@ -80,36 +80,30 @@ public class Tree(
         val guideS = if (node.guideStyle.isNull) null else node.guideStyle
 
         if (!isRoot || !node.hideRoot) {
-            // Emit prefix segments (ancestor guides) then this node's connector.
             val connector = if (isRoot && !node.hideRoot) "" else if (isLast) node.guides.last else node.guides.tee
             val totalPrefixCells = prefix.sumOf { it.length } + connector.length
             val labelWidth = (options.maxWidth - totalPrefixCells).coerceAtLeast(1)
 
             val labelLines = collectLines(node.label.render(console, options.withMaxWidth(labelWidth)))
             for ((i, line) in labelLines.withIndex()) {
-                if (i > 0) yield(Segment.LINE)
+                if (i > 0) add(Segment.LINE)
                 if (i == 0) {
-                    for (p in prefix) if (p.isNotEmpty()) yield(Segment(p, guideS))
-                    if (connector.isNotEmpty()) yield(Segment(connector, guideS))
+                    for (p in prefix) if (p.isNotEmpty()) add(Segment(p, guideS))
+                    if (connector.isNotEmpty()) add(Segment(connector, guideS))
                 } else {
-                    // Continuation line: replace connectors with branch/space
-                    for (p in prefix) if (p.isNotEmpty()) yield(Segment(p, guideS))
+                    for (p in prefix) if (p.isNotEmpty()) add(Segment(p, guideS))
                     val cont = if (isLast) node.guides.space else node.guides.branch
-                    yield(Segment(cont, guideS))
+                    add(Segment(cont, guideS))
                 }
                 if (labelStyle != null) {
-                    for (s in line.segments) yield(if (s.style == null) Segment(s.text, labelStyle) else s)
+                    for (s in line.segments) add(if (s.style == null) Segment(s.text, labelStyle) else s)
                 } else {
-                    for (s in line.segments) yield(s)
+                    for (s in line.segments) add(s)
                 }
             }
         }
 
         if (!node.expanded || node.children.isEmpty()) return
-        // Guide string for descendants below this node:
-        //   if root and hidden → no extra guide
-        //   if isLast → space (no continuing branch under us)
-        //   else → branch (continuing branch from a tee above us)
         val nextPrefix: List<String> = when {
             isRoot && node.hideRoot -> prefix
             isLast -> prefix + node.guides.space
@@ -117,7 +111,7 @@ public class Tree(
         }
 
         for ((i, child) in node.children.withIndex()) {
-            yield(Segment.LINE)
+            add(Segment.LINE)
             renderInto(child, console, options, nextPrefix, isLast = (i == node.children.lastIndex), isRoot = false)
         }
     }

@@ -59,16 +59,15 @@ public class ProgressBar(
         }
     }
 
-    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = sequence {
+    override fun render(console: Console, options: RenderOptions): Sequence<Segment> = buildList {
         val w = (width ?: options.maxWidth).coerceAtMost(options.maxWidth).coerceAtLeast(1)
-        val ascii = false // ascii_only / legacy_windows not yet modelled in RenderOptions
+        val ascii = false
         val shouldPulse = pulse || total == null
         if (shouldPulse) {
-            yieldAll(renderPulse(console, w, ascii))
-            return@sequence
+            addPulse(console, w, ascii)
+            return@buildList
         }
 
-        // After the shouldPulse early-return, total is guaranteed non-null (smart-cast from the `shouldPulse` check).
         val effectiveTotal: Double = total
         val clampedCompleted = completed.coerceIn(0.0, effectiveTotal)
         val bar = if (ascii) "-" else "━"
@@ -82,40 +81,40 @@ public class ProgressBar(
         val isFinished = completed >= effectiveTotal
         val fillStyle = if (isFinished) finishedStyle else completeStyle
 
-        if (barCount > 0) yield(Segment(bar.repeat(barCount), fillStyle))
-        if (halfBarCount > 0) yield(Segment(halfBarRight.repeat(halfBarCount), fillStyle))
+        if (barCount > 0) add(Segment(bar.repeat(barCount), fillStyle))
+        if (halfBarCount > 0) add(Segment(halfBarRight.repeat(halfBarCount), fillStyle))
 
         val noColor = console.colorSystem == ColorSystem.None
         if (!noColor) {
             var remaining = w - barCount - halfBarCount
             if (remaining > 0 && console.colorSystem != ColorSystem.None) {
                 if (halfBarCount == 0 && barCount > 0) {
-                    yield(Segment(halfBarLeft, style))
+                    add(Segment(halfBarLeft, style))
                     remaining -= 1
                 }
-                if (remaining > 0) yield(Segment(bar.repeat(remaining), style))
+                if (remaining > 0) add(Segment(bar.repeat(remaining), style))
             }
         } else {
             val remaining = w - barCount - halfBarCount
-            if (remaining > 0) yield(Segment(" ".repeat(remaining), style))
+            if (remaining > 0) add(Segment(" ".repeat(remaining), style))
         }
-    }
+    }.asSequence()
 
     override fun measure(console: Console, options: RenderOptions): Measurement =
         if (width != null) Measurement(width, width)
         else Measurement(4, options.maxWidth)
 
-    private fun renderPulse(console: Console, width: Int, ascii: Boolean): Sequence<Segment> = sequence {
+    private fun MutableList<Segment>.addPulse(console: Console, width: Int, ascii: Boolean) {
         val foreStyle = pulseStyle
         val backStyle = style
         val pulseSegments = pulseSegments(foreStyle, backStyle, console.colorSystem, ascii)
         val segCount = pulseSegments.size
-        if (segCount == 0) return@sequence
+        if (segCount == 0) return
         val now = animationTime ?: (System.nanoTime() / 1e9)
         val tile = pulseSegments + pulseSegments + pulseSegments
         val offset = (((-now * 15.0).toInt()) % segCount + segCount) % segCount
         for (i in 0 until width) {
-            yield(tile[(offset + i) % segCount])
+            add(tile[(offset + i) % segCount])
         }
     }
 
